@@ -701,7 +701,7 @@
 
           <div class="field">
             <label for="wordTitle">Word 檔標題</label>
-            <input id="wordTitle" type="text" placeholder="留空則使用報表標題" maxlength="80">
+            <input id="wordTitle" type="text" placeholder="未填寫則會自動與「報表標題」相同。" maxlength="80">
           </div>
         </section>
 
@@ -767,6 +767,7 @@
             <button id="printBtn" type="button">匯出 PDF</button>
             <button id="exportBtn" class="secondary" type="button">匯出 Word</button>
           </div>
+          <p class="hint">匯出檔案會交由瀏覽器下載。若找不到檔案，請按 Ctrl+J 開啟下載紀錄，或查看「下載」資料夾。</p>
         </section>
 
         <section class="panel-section" aria-label="已選圖片">
@@ -1763,6 +1764,10 @@
         }, 1000);
       }
 
+      function downloadCompleteMessage(fileName, detail) {
+        return detail + " 檔名：" + fileName + "。檔案已交由瀏覽器下載，通常在「下載」資料夾；若找不到，請按 Ctrl+J 開啟下載紀錄。";
+      }
+
       function loadImageForPdf(item) {
         return new Promise(function (resolve, reject) {
           var img = new Image();
@@ -2018,8 +2023,9 @@
           }
 
           var blob = makePdfBlob(pageImages);
-          downloadBlob(blob, safeFileName(getWordTitle()) + ".pdf");
-          setWarning("已匯出 PDF，檔案約 " + formatBytes(blob.size) + "。");
+          var pdfFileName = safeFileName(getWordTitle()) + ".pdf";
+          downloadBlob(blob, pdfFileName);
+          setWarning(downloadCompleteMessage(pdfFileName, "已匯出 PDF，檔案約 " + formatBytes(blob.size) + "。"));
         } catch (error) {
           setWarning("PDF 匯出失敗，請確認圖片可正常讀取後再試一次。");
         } finally {
@@ -2056,8 +2062,9 @@
 
           exportBtn.textContent = "產生 DOCX...";
           var blob = buildDocxBlob(imageInfos);
-          downloadBlob(blob, safeFileName(getWordTitle()) + ".docx");
-          setWarning("已匯出 Word DOCX。原始圖片約 " + formatBytes(originalBytes) + "，匯出檔約 " + formatBytes(blob.size) + "。");
+          var wordFileName = safeFileName(getWordTitle()) + ".docx";
+          downloadBlob(blob, wordFileName);
+          setWarning(downloadCompleteMessage(wordFileName, "已匯出 Word DOCX。原始圖片約 " + formatBytes(originalBytes) + "，匯出檔約 " + formatBytes(blob.size) + "。"));
         } catch (error) {
           setWarning("匯出失敗，請確認圖片可正常讀取後再試一次。");
         } finally {
