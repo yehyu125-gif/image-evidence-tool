@@ -669,7 +669,7 @@
   <main class="app-shell">
     <header class="workspace-status" aria-label="作業狀態">
       <div class="workspace-title">
-        <div class="eyebrow">EVIDENCE REPORT WORKBENCH</div>
+        <div class="eyebrow">IMAGE-EVIDENCE-TOOL</div>
         <h1>圖證彙整工具</h1>
       </div>
       <div class="status-metrics">
@@ -750,10 +750,10 @@
           </div>
         </section>
 
-        <section class="panel-section" aria-label="列印與匯出">
-          <h2 class="section-title">列印與匯出</h2>
+        <section class="panel-section" aria-label="PDF 與 Word 匯出">
+          <h2 class="section-title">PDF 與 Word 匯出</h2>
           <div class="field">
-            <label for="exportQuality">Word 匯出圖片品質</label>
+            <label for="exportQuality">PDF / Word 匯出圖片品質</label>
             <select id="exportQuality">
               <option value="clear" selected>清楚優先（建議）</option>
               <option value="small">較小檔案</option>
@@ -764,7 +764,7 @@
           <div id="warning" class="warning" role="status"></div>
 
           <div class="button-row">
-            <button id="printBtn" type="button">列印</button>
+            <button id="printBtn" type="button">匯出 PDF</button>
             <button id="exportBtn" class="secondary" type="button">匯出 Word</button>
           </div>
         </section>
@@ -820,6 +820,11 @@
         clear: { maxLongEdge: 2400, jpegQuality: 0.86 },
         small: { maxLongEdge: 1700, jpegQuality: 0.78 },
         high: { maxLongEdge: 3200, jpegQuality: 0.9 }
+      };
+      var pdfProfiles = {
+        clear: { dpi: 170, jpegQuality: 0.86 },
+        small: { dpi: 130, jpegQuality: 0.78 },
+        high: { dpi: 210, jpegQuality: 0.9 }
       };
       var wordLayout = {
         pageWidth: 210,
@@ -899,6 +904,10 @@
 
       function getExportProfile() {
         return exportProfiles[exportQualitySelect.value] || exportProfiles.clear;
+      }
+
+      function getPdfProfile() {
+        return pdfProfiles[exportQualitySelect.value] || pdfProfiles.clear;
       }
 
       function getWordTitle() {
@@ -1754,6 +1763,271 @@
         }, 1000);
       }
 
+      function loadImageForPdf(item) {
+        return new Promise(function (resolve, reject) {
+          var img = new Image();
+          img.onload = function () {
+            resolve(img);
+          };
+          img.onerror = function () {
+            reject(new Error("PDF 圖片讀取失敗"));
+          };
+          img.src = item.url;
+        });
+      }
+
+      function pdfMmToPx(valueMm, dpi) {
+        return valueMm * dpi / 25.4;
+      }
+
+      function drawCenteredCanvasText(context, text, x, y, width, fontPx, bold, color) {
+        var safeText = String(text || "");
+        var size = fontPx;
+        context.textAlign = "center";
+        context.textBaseline = "middle";
+        context.fillStyle = color || "#1F2937";
+
+        while (size > 10) {
+          context.font = (bold ? "700 " : "400 ") + size + "px Microsoft JhengHei, Arial, sans-serif";
+          if (context.measureText(safeText).width <= width) {
+            break;
+          }
+          size -= 1;
+        }
+
+        context.fillText(safeText, x + width / 2, y);
+      }
+
+      async function renderPdfPageDataUrl(pageIndex, pageCount, cols, rows, perPage, profile) {
+        var dpi = profile.dpi;
+        var pageWidthPx = Math.round(pdfMmToPx(wordLayout.pageWidth, dpi));
+        var pageHeightPx = Math.round(pdfMmToPx(wordLayout.pageHeight, dpi));
+        var canvas = document.createElement("canvas");
+        canvas.width = pageWidthPx;
+        canvas.height = pageHeightPx;
+
+        var context = canvas.getContext("2d");
+        context.imageSmoothingEnabled = true;
+        context.imageSmoothingQuality = "high";
+        context.fillStyle = "#FFFFFF";
+        context.fillRect(0, 0, pageWidthPx, pageHeightPx);
+
+        var duplex = isDuplexPrint();
+        var oddPage = pageIndex % 2 === 0;
+        var leftMm = wordLayout.padOuter + (duplex && oddPage ? wordLayout.binding : 0);
+        var rightMm = wordLayout.padOuter + (duplex && !oddPage ? wordLayout.binding : 0);
+        var topPx = pdfMmToPx(wordLayout.padTop, dpi);
+        var bottomPx = pdfMmToPx(wordLayout.padBottom, dpi);
+        var leftPx = pdfMmToPx(leftMm, dpi);
+        var rightPx = pdfMmToPx(rightMm, dpi);
+        var contentWidthPx = pageWidthPx - leftPx - rightPx;
+        var contentHeightPx = pageHeightPx - topPx - bottomPx;
+        var headerHeightPx = pdfMmToPx(wordLayout.headerHeight, dpi);
+        var footerHeightPx = pdfMmToPx(wordLayout.footerHeight, dpi);
+        var gapTopPx = pdfMmToPx(wordLayout.bodyGapTop, dpi);
+        var gapBottomPx = pdfMmToPx(wordLayout.bodyGapBottom, dpi);
+        var tableX = leftPx;
+        var tableY = topPx + headerHeightPx + gapTopPx;
+        var tableWidth = contentWidthPx;
+        var tableHeight = contentHeightPx - headerHeightPx - footerHeightPx - gapTopPx - gapBottomPx;
+        var cellWidth = tableWidth / cols;
+        var cellHeight = tableHeight / rows;
+        var lineWidth = Math.max(1, pdfMmToPx(0.4, dpi));
+        var title = getWordTitle();
+        var captionMode = getCaptionMode();
+        var hasCaption = captionMode !== "none";
+        var cellPadding = pdfMmToPx(rows >= 4 ? 1.2 : (rows === 3 ? 1.6 : 2.2), dpi);
+        var cellGap = pdfMmToPx(rows >= 4 ? 0.7 : (rows === 3 ? 1 : 1.7), dpi);
+        var captionHeight = hasCaption ? pdfMmToPx(rows >= 4 ? 3.8 : (rows === 3 ? 4.5 : 5.5), dpi) : 0;
+        var titleFontPx = 18 * dpi / 72;
+        var footerFontPx = 10.5 * dpi / 72;
+        var captionFontPx = (rows >= 4 ? 8.5 : (rows === 3 ? 9.3 : 10.5)) * dpi / 72;
+
+        drawCenteredCanvasText(context, title, leftPx, topPx + headerHeightPx * 0.38, contentWidthPx, titleFontPx, true, "#1F2937");
+        context.strokeStyle = "#CBD5E1";
+        context.lineWidth = Math.max(1, pdfMmToPx(0.45, dpi));
+        context.beginPath();
+        context.moveTo(leftPx, topPx + headerHeightPx);
+        context.lineTo(leftPx + contentWidthPx, topPx + headerHeightPx);
+        context.stroke();
+
+        context.strokeStyle = "#CBD5E1";
+        context.lineWidth = lineWidth;
+        for (var c = 0; c <= cols; c += 1) {
+          var x = tableX + c * cellWidth;
+          context.beginPath();
+          context.moveTo(x, tableY);
+          context.lineTo(x, tableY + tableHeight);
+          context.stroke();
+        }
+        for (var r = 0; r <= rows; r += 1) {
+          var y = tableY + r * cellHeight;
+          context.beginPath();
+          context.moveTo(tableX, y);
+          context.lineTo(tableX + tableWidth, y);
+          context.stroke();
+        }
+
+        for (var row = 0; row < rows; row += 1) {
+          for (var col = 0; col < cols; col += 1) {
+            var imageIndex = pageIndex * perPage + row * cols + col;
+            var item = images[imageIndex];
+            if (!item) {
+              continue;
+            }
+
+            var cellX = tableX + col * cellWidth;
+            var cellY = tableY + row * cellHeight;
+            var innerX = cellX + cellPadding;
+            var innerY = cellY + cellPadding;
+            var innerWidth = Math.max(1, cellWidth - cellPadding * 2);
+            var imageAreaHeight = Math.max(1, cellHeight - cellPadding * 2 - captionHeight - (hasCaption ? cellGap : 0));
+            var img = await loadImageForPdf(item);
+            var fitted = fitImageSize(img.naturalWidth || img.width, img.naturalHeight || img.height, innerWidth, imageAreaHeight);
+            var imageX = innerX + (innerWidth - fitted.width) / 2;
+            var imageY = innerY + (imageAreaHeight - fitted.height) / 2;
+            context.drawImage(img, imageX, imageY, fitted.width, fitted.height);
+
+            var caption = hasCaption ? captionFor(item, imageIndex) : "";
+            if (caption) {
+              drawCenteredCanvasText(
+                context,
+                caption,
+                innerX,
+                cellY + cellHeight - cellPadding - captionHeight / 2,
+                innerWidth,
+                captionFontPx,
+                false,
+                "#1F2937"
+              );
+            }
+          }
+        }
+
+        drawCenteredCanvasText(
+          context,
+          "第" + (pageIndex + 1) + "頁 共" + pageCount + "頁",
+          leftPx,
+          pageHeightPx - bottomPx - footerHeightPx * 0.35,
+          contentWidthPx,
+          footerFontPx,
+          false,
+          "#1F2937"
+        );
+
+        return {
+          dataUrl: canvas.toDataURL("image/jpeg", profile.jpegQuality),
+          width: pageWidthPx,
+          height: pageHeightPx
+        };
+      }
+
+      function makePdfBlob(pageImages) {
+        var encoder = new TextEncoder();
+        var parts = [];
+        var offsets = [0];
+        var length = 0;
+        var pageCount = pageImages.length;
+        var objectCount = 2 + pageCount * 3;
+        var pageWidthPt = wordLayout.pageWidth * 72 / 25.4;
+        var pageHeightPt = wordLayout.pageHeight * 72 / 25.4;
+
+        function addText(text) {
+          var bytes = encoder.encode(text);
+          parts.push(bytes);
+          length += bytes.length;
+        }
+
+        function addBytes(bytes) {
+          parts.push(bytes);
+          length += bytes.length;
+        }
+
+        function beginObject(id) {
+          offsets[id] = length;
+          addText(id + " 0 obj\n");
+        }
+
+        addText("%PDF-1.4\n%\xE2\xE3\xCF\xD3\n");
+
+        beginObject(1);
+        addText("<< /Type /Catalog /Pages 2 0 R >>\nendobj\n");
+
+        beginObject(2);
+        var kids = [];
+        for (var i = 0; i < pageCount; i += 1) {
+          kids.push((3 + i * 3) + " 0 R");
+        }
+        addText("<< /Type /Pages /Kids [" + kids.join(" ") + "] /Count " + pageCount + " >>\nendobj\n");
+
+        pageImages.forEach(function (pageImage, index) {
+          var pageObject = 3 + index * 3;
+          var contentObject = pageObject + 1;
+          var imageObject = pageObject + 2;
+          var imageName = "Im" + (index + 1);
+          var imageBytes = base64ToBytes(pageImage.dataUrl);
+          var content = "q\n" + pageWidthPt.toFixed(2) + " 0 0 " + pageHeightPt.toFixed(2) + " 0 0 cm\n/" + imageName + " Do\nQ\n";
+
+          beginObject(pageObject);
+          addText("<< /Type /Page /Parent 2 0 R /MediaBox [0 0 " + pageWidthPt.toFixed(2) + " " + pageHeightPt.toFixed(2) + "] /Resources << /XObject << /" + imageName + " " + imageObject + " 0 R >> >> /Contents " + contentObject + " 0 R >>\nendobj\n");
+
+          beginObject(contentObject);
+          addText("<< /Length " + encoder.encode(content).length + " >>\nstream\n" + content + "endstream\nendobj\n");
+
+          beginObject(imageObject);
+          addText("<< /Type /XObject /Subtype /Image /Width " + pageImage.width + " /Height " + pageImage.height + " /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length " + imageBytes.length + " >>\nstream\n");
+          addBytes(imageBytes);
+          addText("\nendstream\nendobj\n");
+        });
+
+        var xrefOffset = length;
+        addText("xref\n0 " + (objectCount + 1) + "\n");
+        addText("0000000000 65535 f \n");
+        for (var obj = 1; obj <= objectCount; obj += 1) {
+          addText(String(offsets[obj]).padStart(10, "0") + " 00000 n \n");
+        }
+        addText("trailer\n<< /Size " + (objectCount + 1) + " /Root 1 0 R >>\nstartxref\n" + xrefOffset + "\n%%EOF");
+
+        return new Blob(parts, { type: "application/pdf" });
+      }
+
+      async function exportPdf() {
+        if (!images.length) {
+          setWarning("請先選取圖片，再匯出 PDF。");
+          return;
+        }
+
+        printBtn.disabled = true;
+        printBtn.textContent = "產生 PDF...";
+        setWarning("");
+
+        try {
+          var cols = Number(colsSelect.value);
+          var rows = Number(rowsSelect.value);
+          var perPage = cols * rows;
+          var pageCount = Math.ceil(images.length / perPage);
+          var profile = getPdfProfile();
+          var pageImages = [];
+
+          for (var pageIndex = 0; pageIndex < pageCount; pageIndex += 1) {
+            printBtn.textContent = "產生 PDF " + (pageIndex + 1) + "/" + pageCount;
+            pageImages.push(await renderPdfPageDataUrl(pageIndex, pageCount, cols, rows, perPage, profile));
+            await new Promise(function (resolve) {
+              setTimeout(resolve, 0);
+            });
+          }
+
+          var blob = makePdfBlob(pageImages);
+          downloadBlob(blob, safeFileName(getWordTitle()) + ".pdf");
+          setWarning("已匯出 PDF，檔案約 " + formatBytes(blob.size) + "。");
+        } catch (error) {
+          setWarning("PDF 匯出失敗，請確認圖片可正常讀取後再試一次。");
+        } finally {
+          printBtn.disabled = false;
+          printBtn.textContent = "匯出 PDF";
+        }
+      }
+
       async function exportWord() {
         if (!images.length) {
           setWarning("請先選取圖片，再匯出 Word。");
@@ -1806,13 +2080,7 @@
         input.addEventListener("change", renderReport);
       });
 
-      printBtn.addEventListener("click", function () {
-        if (!images.length) {
-          setWarning("請先選取圖片，再執行列印。");
-          return;
-        }
-        window.print();
-      });
+      printBtn.addEventListener("click", exportPdf);
 
       exportBtn.addEventListener("click", exportWord);
 
