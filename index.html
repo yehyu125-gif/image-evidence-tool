@@ -15,14 +15,15 @@
       --header-h: 15mm;
       --footer-h: 8mm;
       --gap-y: 3.5mm;
-      --line: #222;
-      --ink: #111827;
-      --muted: #5b6472;
-      --bg: #eef1f5;
-      --panel: #ffffff;
-      --accent: #1464d2;
-      --accent-dark: #0f4fa9;
-      --warn: #935f00;
+      --line: #CBD5E1;
+      --ink: #1F2937;
+      --muted: #64748B;
+      --bg: #F4F7FA;
+      --panel: #FFFFFF;
+      --accent: #0B1F3A;
+      --accent-dark: #153B66;
+      --gold: #C9A227;
+      --warn: #7A5411;
     }
 
     * {
@@ -41,34 +42,92 @@
       height: 100vh;
       display: grid;
       grid-template-columns: minmax(310px, 380px) 1fr;
+      grid-template-rows: auto minmax(0, 1fr);
       gap: 20px;
       padding: 20px;
       overflow: hidden;
     }
 
-    .control-panel {
-      position: sticky;
-      top: 20px;
-      align-self: start;
-      max-height: calc(100vh - 40px);
-      background: var(--panel);
-      border: 1px solid #d5dae2;
+    .workspace-status {
+      grid-column: 1 / -1;
+      min-height: 70px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 18px;
+      padding: 14px 18px;
+      border-bottom: 3px solid var(--gold);
       border-radius: 8px;
-      box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+      background: var(--accent);
+      box-shadow: 0 10px 24px rgba(11, 31, 58, 0.14);
+      color: #fff;
+    }
+
+    .workspace-title {
+      display: grid;
+      gap: 2px;
+    }
+
+    .eyebrow {
+      color: #D8E1EC;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+    }
+
+    .workspace-status h1 {
+      margin: 0;
+      font-size: 24px;
+      line-height: 1.2;
+      letter-spacing: 0;
+    }
+
+    .status-metrics {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      gap: 8px;
+      color: #E5ECF5;
+      font-size: 13px;
+    }
+
+    .status-metrics span {
+      min-height: 30px;
+      display: inline-flex;
+      align-items: center;
+      padding: 5px 10px;
+      border: 1px solid rgba(201, 162, 39, 0.45);
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.08);
+      white-space: nowrap;
+    }
+
+    .control-panel {
+      align-self: stretch;
+      height: 100%;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: 0 12px 28px rgba(11, 31, 58, 0.10);
       overflow-y: auto;
       overscroll-behavior: contain;
     }
 
     .panel-head {
-      padding: 18px 18px 14px;
-      border-bottom: 1px solid #e2e6ec;
-      background: #f9fafc;
+      padding: 16px 18px 12px;
+      border-bottom: 1px solid var(--line);
+      background: #F8FAFC;
     }
 
     h1 {
       margin: 0;
       font-size: 22px;
       letter-spacing: 0;
+    }
+
+    .panel-head h1 {
+      color: var(--accent);
+      font-size: 17px;
     }
 
     .panel-head p {
@@ -78,16 +137,45 @@
     }
 
     .maker-credit {
-      margin-top: 4px;
-      color: #334155;
+      margin-top: 8px;
+      padding-left: 9px;
+      border-left: 3px solid var(--gold);
+      color: var(--ink);
       font-size: 13px;
       font-weight: 700;
     }
 
     .panel-body {
-      padding: 16px 18px 18px;
+      padding: 14px;
       display: grid;
-      gap: 15px;
+      gap: 12px;
+    }
+
+    .panel-section {
+      display: grid;
+      gap: 12px;
+      padding: 14px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+    }
+
+    .section-title {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin: 0;
+      color: var(--accent);
+      font-size: 14px;
+      font-weight: 800;
+    }
+
+    .section-title::before {
+      content: "";
+      width: 4px;
+      height: 16px;
+      border-radius: 999px;
+      background: var(--gold);
     }
 
     .field {
@@ -101,11 +189,17 @@
       font-size: 14px;
     }
 
+    .field-title {
+      padding-left: 8px;
+      border-left: 3px solid var(--gold);
+      color: var(--ink);
+    }
+
     input[type="text"],
     select {
       width: 100%;
       min-height: 40px;
-      border: 1px solid #b9c1cc;
+      border: 1px solid var(--line);
       border-radius: 6px;
       padding: 7px 10px;
       font: inherit;
@@ -113,12 +207,19 @@
       color: var(--ink);
     }
 
+    input[type="text"]:focus,
+    select:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(201, 162, 39, 0.18);
+      outline: none;
+    }
+
     input[type="file"] {
       width: 100%;
       padding: 10px;
-      border: 1px dashed #9aa5b4;
+      border: 1px dashed var(--line);
       border-radius: 6px;
-      background: #fbfcff;
+      background: #F8FAFC;
       color: var(--ink);
       font: inherit;
     }
@@ -132,25 +233,45 @@
     .radio-grid {
       display: grid;
       grid-template-columns: 1fr 1fr;
-      gap: 8px;
+      gap: 1px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      overflow: hidden;
+      background: var(--line);
     }
 
     .radio-grid label {
       min-height: 38px;
       display: flex;
       align-items: center;
+      justify-content: center;
       gap: 8px;
       padding: 7px 9px;
-      border: 1px solid #d2d8e0;
-      border-radius: 6px;
       background: #fff;
       font-weight: 500;
       cursor: pointer;
+      text-align: center;
+    }
+
+    .radio-grid label:hover {
+      background: #F8FAFC;
+    }
+
+    .radio-grid label:has(input:checked) {
+      color: #fff;
+      background: var(--accent);
+      box-shadow: inset 0 -3px 0 var(--gold);
     }
 
     .radio-grid input {
-      margin: 0;
+      position: absolute;
+      opacity: 0;
+      pointer-events: none;
       accent-color: var(--accent);
+    }
+
+    .radio-grid.caption-options label:last-child {
+      grid-column: 1 / -1;
     }
 
     .button-row {
@@ -178,8 +299,8 @@
 
     button.secondary {
       color: var(--accent);
-      border-color: #b8cdf0;
-      background: #eef5ff;
+      border-color: var(--line);
+      background: #fff;
     }
 
     button.secondary:hover {
@@ -197,9 +318,9 @@
     .warning {
       display: none;
       padding: 10px 12px;
-      border: 1px solid #f2cf82;
+      border: 1px solid rgba(201, 162, 39, 0.55);
       border-radius: 6px;
-      background: #fff7e6;
+      background: #FFFBEB;
       color: var(--warn);
       font-size: 14px;
     }
@@ -211,7 +332,7 @@
     .file-list {
       max-height: 145px;
       overflow: auto;
-      border: 1px solid #e0e5ed;
+      border: 1px solid var(--line);
       border-radius: 6px;
       background: #fff;
       padding: 7px 9px;
@@ -234,7 +355,7 @@
       display: grid;
       gap: 14px;
       align-content: start;
-      height: calc(100vh - 40px);
+      height: 100%;
       overflow: auto;
       padding-right: 4px;
       overscroll-behavior: contain;
@@ -245,6 +366,11 @@
       align-items: center;
       justify-content: space-between;
       gap: 14px;
+      padding: 10px 12px;
+      border: 1px solid var(--line);
+      border-left: 3px solid var(--gold);
+      border-radius: 6px;
+      background: #fff;
       color: var(--muted);
       font-size: 14px;
     }
@@ -265,7 +391,7 @@
       display: grid;
       place-items: center;
       padding: 30px;
-      border: 1px dashed #aeb8c5;
+      border: 1px dashed var(--line);
       border-radius: 8px;
       background: #fff;
       color: var(--muted);
@@ -276,9 +402,9 @@
       width: var(--paper-w);
       height: var(--paper-h);
       background: #fff;
-      box-shadow: 0 12px 30px rgba(15, 23, 42, 0.18);
+      box-shadow: 0 12px 30px rgba(11, 31, 58, 0.16);
       overflow: hidden;
-      color: #000;
+      color: var(--ink);
       page-break-after: always;
       break-after: page;
     }
@@ -317,7 +443,7 @@
       align-items: flex-start;
       justify-content: center;
       padding: 0 4mm 4mm;
-      border-bottom: 0.45mm solid #333;
+      border-bottom: 0.45mm solid var(--line);
       font-size: 18pt;
       line-height: 1.2;
       font-weight: 700;
@@ -338,7 +464,7 @@
       display: flex;
       align-items: flex-end;
       justify-content: center;
-      color: #000;
+      color: var(--ink);
       font-size: 10.5pt;
       line-height: 1.2;
       text-align: center;
@@ -413,7 +539,7 @@
     .caption {
       width: 100%;
       min-height: var(--caption-h, 5.5mm);
-      color: #000;
+      color: var(--ink);
       font-size: var(--caption-font, 10.5pt);
       line-height: 1.25;
       text-align: center;
@@ -436,15 +562,24 @@
     @media (max-width: 980px) {
       .app-shell {
         grid-template-columns: 1fr;
+        grid-template-rows: auto auto auto;
         height: auto;
         min-height: 100vh;
         padding: 12px;
         overflow: visible;
       }
 
+      .workspace-status {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+
+      .status-metrics {
+        justify-content: flex-start;
+      }
+
       .control-panel {
-        position: static;
-        max-height: none;
+        height: auto;
         overflow: visible;
       }
 
@@ -495,6 +630,7 @@
       }
 
       .control-panel,
+      .workspace-status,
       .preview-bar,
       .empty-state {
         display: none !important;
@@ -531,99 +667,119 @@
 </head>
 <body class="print-duplex">
   <main class="app-shell">
+    <header class="workspace-status" aria-label="作業狀態">
+      <div class="workspace-title">
+        <div class="eyebrow">EVIDENCE REPORT WORKBENCH</div>
+        <h1>圖證彙整工具</h1>
+      </div>
+      <div class="status-metrics">
+        <span id="topSummary">0 張圖片 / 0 頁</span>
+        <span id="topLayout">A4 直式 / 雙面列印</span>
+      </div>
+    </header>
+
     <section class="control-panel" aria-label="報表設定">
       <div class="panel-head">
-        <h1>圖證彙整工具</h1>
+        <h1>作業設定</h1>
         <p>單一離線 HTML，支援 A4 直式、列印模式與 Word DOCX 匯出。</p>
         <div class="maker-credit">製作人:永和偵查員葉哲宇 2026v1</div>
       </div>
 
       <div class="panel-body">
-        <div class="field">
-          <label for="imageInput">選取圖片</label>
-          <input id="imageInput" type="file" accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp" multiple>
-          <p class="hint">可一次選取多張 JPG、JPEG、PNG、WEBP 圖片。</p>
-        </div>
-
-        <div class="field">
-          <label for="reportTitle">報表標題</label>
-          <input id="reportTitle" type="text" value="圖證彙整" maxlength="80">
-        </div>
-
-        <div class="field">
-          <label for="wordTitle">Word 檔標題</label>
-          <input id="wordTitle" type="text" placeholder="留空則使用報表標題" maxlength="80">
-        </div>
-
-        <div class="field">
-          <div class="field-title">列印方式</div>
-          <div class="radio-grid">
-            <label><input type="radio" name="printMode" value="single"> 單面列印</label>
-            <label><input type="radio" name="printMode" value="duplex" checked> 雙面列印</label>
-          </div>
-          <p class="hint">單面每頁置中；雙面保留左右鏡像裝訂空間。</p>
-        </div>
-
-        <div class="inline-grid">
+        <section class="panel-section" aria-label="基本資料">
+          <h2 class="section-title">基本資料</h2>
           <div class="field">
-            <label for="cols">每頁欄數</label>
-            <select id="cols">
-              <option value="1">1 欄</option>
-              <option value="2" selected>2 欄</option>
-              <option value="3">3 欄</option>
-              <option value="4">4 欄</option>
-            </select>
+            <label for="imageInput">選取圖片</label>
+            <input id="imageInput" type="file" accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp" multiple>
+            <p class="hint">可一次選取多張 JPG、JPEG、PNG、WEBP 圖片。</p>
           </div>
 
           <div class="field">
-            <label for="rows">每頁列數</label>
-            <select id="rows">
-              <option value="1">1 列</option>
-              <option value="2" selected>2 列</option>
-              <option value="3">3 列</option>
-              <option value="4">4 列</option>
+            <label for="reportTitle">報表標題</label>
+            <input id="reportTitle" type="text" value="圖證彙整" maxlength="80">
+          </div>
+
+          <div class="field">
+            <label for="wordTitle">Word 檔標題</label>
+            <input id="wordTitle" type="text" placeholder="留空則使用報表標題" maxlength="80">
+          </div>
+        </section>
+
+        <section class="panel-section" aria-label="版面設定">
+          <h2 class="section-title">版面設定</h2>
+          <div class="field">
+            <div class="field-title">列印方式</div>
+            <div class="radio-grid two-options">
+              <label><input type="radio" name="printMode" value="single"> 單面列印</label>
+              <label><input type="radio" name="printMode" value="duplex" checked> 雙面列印</label>
+            </div>
+            <p class="hint">單面每頁置中；雙面保留左右鏡像裝訂空間。</p>
+          </div>
+
+          <div class="inline-grid">
+            <div class="field">
+              <label for="cols">每頁欄數</label>
+              <select id="cols">
+                <option value="1">1 欄</option>
+                <option value="2" selected>2 欄</option>
+                <option value="3">3 欄</option>
+                <option value="4">4 欄</option>
+              </select>
+            </div>
+
+            <div class="field">
+              <label for="rows">每頁列數</label>
+              <select id="rows">
+                <option value="1">1 列</option>
+                <option value="2" selected>2 列</option>
+                <option value="3">3 列</option>
+                <option value="4">4 列</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="field">
+            <div class="field-title">圖片下方標示</div>
+            <div class="radio-grid caption-options">
+              <label><input type="radio" name="captionMode" value="serial" checked> 流水編號</label>
+              <label><input type="radio" name="captionMode" value="name"> 檔名</label>
+              <label><input type="radio" name="captionMode" value="full"> 檔名含副檔名</label>
+              <label><input type="radio" name="captionMode" value="date"> 日期</label>
+              <label><input type="radio" name="captionMode" value="none"> 不顯示</label>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel-section" aria-label="列印與匯出">
+          <h2 class="section-title">列印與匯出</h2>
+          <div class="field">
+            <label for="exportQuality">Word 匯出圖片品質</label>
+            <select id="exportQuality">
+              <option value="clear" selected>清楚優先（建議）</option>
+              <option value="small">較小檔案</option>
+              <option value="high">高解析（檔案較大）</option>
             </select>
           </div>
-        </div>
 
-        <div class="field">
-          <label for="exportQuality">Word 匯出圖片品質</label>
-          <select id="exportQuality">
-            <option value="clear" selected>清楚優先（建議）</option>
-            <option value="small">較小檔案</option>
-            <option value="high">高解析（檔案較大）</option>
-          </select>
-        </div>
+          <div id="warning" class="warning" role="status"></div>
 
-        <div class="field">
-          <div class="field-title">圖片下方標示</div>
-          <div class="radio-grid">
-            <label><input type="radio" name="captionMode" value="serial" checked> 流水編號</label>
-            <label><input type="radio" name="captionMode" value="name"> 檔名</label>
-            <label><input type="radio" name="captionMode" value="full"> 檔名含副檔名</label>
-            <label><input type="radio" name="captionMode" value="date"> 日期</label>
-            <label><input type="radio" name="captionMode" value="none"> 不顯示</label>
+          <div class="button-row">
+            <button id="printBtn" type="button">列印</button>
+            <button id="exportBtn" class="secondary" type="button">匯出 Word</button>
           </div>
-        </div>
+        </section>
 
-        <div id="warning" class="warning" role="status"></div>
-
-        <div class="button-row">
-          <button id="printBtn" type="button">列印</button>
-          <button id="exportBtn" class="secondary" type="button">匯出 Word</button>
-        </div>
-
-        <div class="field">
-          <div class="field-title">已選圖片</div>
+        <section class="panel-section" aria-label="已選圖片">
+          <h2 class="section-title">已選圖片</h2>
           <div id="fileList" class="file-list">尚未選取圖片。</div>
-        </div>
+        </section>
       </div>
     </section>
 
     <section class="preview-wrap" aria-label="報表預覽">
       <div class="preview-bar">
         <span id="summary"><strong>0</strong> 張圖片，<strong>0</strong> 頁</span>
-        <span>A4 直式預覽</span>
+        <span id="previewMeta">A4 直式 / 雙面列印預覽</span>
       </div>
       <div id="report">
         <div class="empty-state">請先選取圖片，預覽會顯示在這裡。</div>
@@ -642,8 +798,11 @@
       var rowsSelect = document.getElementById("rows");
       var exportQualitySelect = document.getElementById("exportQuality");
       var printModeInputs = document.querySelectorAll("input[name='printMode']");
+      var topSummary = document.getElementById("topSummary");
+      var topLayout = document.getElementById("topLayout");
       var report = document.getElementById("report");
       var summary = document.getElementById("summary");
+      var previewMeta = document.getElementById("previewMeta");
       var warning = document.getElementById("warning");
       var fileList = document.getElementById("fileList");
       var printBtn = document.getElementById("printBtn");
@@ -840,8 +999,13 @@
         var perPage = cols * rows;
         var pageCount = images.length ? Math.ceil(images.length / perPage) : 0;
         var title = titleInput.value.trim() || "圖證彙整";
+        var printLabel = isDuplexPrint() ? "雙面列印" : "單面列印";
+        var layoutText = "A4 直式 / " + printLabel + " / " + cols + "欄 x " + rows + "列";
 
         summary.innerHTML = "<strong>" + images.length + "</strong> 張圖片，<strong>" + pageCount + "</strong> 頁";
+        topSummary.textContent = images.length + " 張圖片 / " + pageCount + " 頁";
+        topLayout.textContent = layoutText;
+        previewMeta.textContent = layoutText + " / 預覽";
         report.innerHTML = "";
 
         if (!images.length) {
