@@ -1,0 +1,1659 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>圖證彙整工具</title>
+  <style>
+    :root {
+      --paper-w: 210mm;
+      --paper-h: 297mm;
+      --page-pad-top: 13mm;
+      --page-pad-bottom: 12mm;
+      --page-pad-outer: 13mm;
+      --binding-space: 15mm;
+      --header-h: 15mm;
+      --footer-h: 8mm;
+      --gap-y: 3.5mm;
+      --line: #222;
+      --ink: #111827;
+      --muted: #5b6472;
+      --bg: #eef1f5;
+      --panel: #ffffff;
+      --accent: #1464d2;
+      --accent-dark: #0f4fa9;
+      --warn: #935f00;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      color: var(--ink);
+      background: var(--bg);
+      font-family: "Microsoft JhengHei", "PingFang TC", "Noto Sans TC", Arial, sans-serif;
+      line-height: 1.5;
+    }
+
+    .app-shell {
+      height: 100vh;
+      display: grid;
+      grid-template-columns: minmax(310px, 380px) 1fr;
+      gap: 20px;
+      padding: 20px;
+      overflow: hidden;
+    }
+
+    .control-panel {
+      position: sticky;
+      top: 20px;
+      align-self: start;
+      max-height: calc(100vh - 40px);
+      background: var(--panel);
+      border: 1px solid #d5dae2;
+      border-radius: 8px;
+      box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+      overflow-y: auto;
+      overscroll-behavior: contain;
+    }
+
+    .panel-head {
+      padding: 18px 18px 14px;
+      border-bottom: 1px solid #e2e6ec;
+      background: #f9fafc;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 22px;
+      letter-spacing: 0;
+    }
+
+    .panel-head p {
+      margin: 6px 0 0;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .maker-credit {
+      margin-top: 4px;
+      color: #334155;
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .panel-body {
+      padding: 16px 18px 18px;
+      display: grid;
+      gap: 15px;
+    }
+
+    .field {
+      display: grid;
+      gap: 7px;
+    }
+
+    label,
+    .field-title {
+      font-weight: 700;
+      font-size: 14px;
+    }
+
+    input[type="text"],
+    select {
+      width: 100%;
+      min-height: 40px;
+      border: 1px solid #b9c1cc;
+      border-radius: 6px;
+      padding: 7px 10px;
+      font: inherit;
+      background: #fff;
+      color: var(--ink);
+    }
+
+    input[type="file"] {
+      width: 100%;
+      padding: 10px;
+      border: 1px dashed #9aa5b4;
+      border-radius: 6px;
+      background: #fbfcff;
+      color: var(--ink);
+      font: inherit;
+    }
+
+    .inline-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    .radio-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .radio-grid label {
+      min-height: 38px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 7px 9px;
+      border: 1px solid #d2d8e0;
+      border-radius: 6px;
+      background: #fff;
+      font-weight: 500;
+      cursor: pointer;
+    }
+
+    .radio-grid input {
+      margin: 0;
+      accent-color: var(--accent);
+    }
+
+    .button-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-top: 2px;
+    }
+
+    button {
+      min-height: 42px;
+      border: 1px solid transparent;
+      border-radius: 6px;
+      padding: 8px 12px;
+      font: inherit;
+      font-weight: 700;
+      cursor: pointer;
+      color: #fff;
+      background: var(--accent);
+    }
+
+    button:hover {
+      background: var(--accent-dark);
+    }
+
+    button.secondary {
+      color: var(--accent);
+      border-color: #b8cdf0;
+      background: #eef5ff;
+    }
+
+    button.secondary:hover {
+      color: #fff;
+      background: var(--accent-dark);
+      border-color: var(--accent-dark);
+    }
+
+    .hint {
+      margin: 0;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .warning {
+      display: none;
+      padding: 10px 12px;
+      border: 1px solid #f2cf82;
+      border-radius: 6px;
+      background: #fff7e6;
+      color: var(--warn);
+      font-size: 14px;
+    }
+
+    .warning.is-visible {
+      display: block;
+    }
+
+    .file-list {
+      max-height: 145px;
+      overflow: auto;
+      border: 1px solid #e0e5ed;
+      border-radius: 6px;
+      background: #fff;
+      padding: 7px 9px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .file-list ol {
+      margin: 0;
+      padding-left: 22px;
+    }
+
+    .file-list li {
+      padding: 2px 0;
+      overflow-wrap: anywhere;
+    }
+
+    .preview-wrap {
+      min-width: 0;
+      display: grid;
+      gap: 14px;
+      align-content: start;
+      height: calc(100vh - 40px);
+      overflow: auto;
+      padding-right: 4px;
+      overscroll-behavior: contain;
+    }
+
+    .preview-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .preview-bar strong {
+      color: var(--ink);
+    }
+
+    #report {
+      display: grid;
+      justify-items: center;
+      gap: 16px;
+    }
+
+    .empty-state {
+      width: min(760px, 100%);
+      min-height: 300px;
+      display: grid;
+      place-items: center;
+      padding: 30px;
+      border: 1px dashed #aeb8c5;
+      border-radius: 8px;
+      background: #fff;
+      color: var(--muted);
+      text-align: center;
+    }
+
+    .page {
+      width: var(--paper-w);
+      height: var(--paper-h);
+      background: #fff;
+      box-shadow: 0 12px 30px rgba(15, 23, 42, 0.18);
+      overflow: hidden;
+      color: #000;
+      page-break-after: always;
+      break-after: page;
+    }
+
+    .page:last-child {
+      page-break-after: auto;
+      break-after: auto;
+    }
+
+    .page-inner {
+      width: 100%;
+      height: 100%;
+      display: grid;
+      grid-template-rows: var(--header-h) minmax(0, 1fr) var(--footer-h);
+      padding-top: var(--page-pad-top);
+      padding-bottom: var(--page-pad-bottom);
+    }
+
+    .page.odd .page-inner {
+      padding-left: calc(var(--page-pad-outer) + var(--binding-space));
+      padding-right: var(--page-pad-outer);
+    }
+
+    .page.even .page-inner {
+      padding-left: var(--page-pad-outer);
+      padding-right: calc(var(--page-pad-outer) + var(--binding-space));
+    }
+
+    body.print-single .page .page-inner {
+      padding-left: var(--page-pad-outer);
+      padding-right: var(--page-pad-outer);
+    }
+
+    .page-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      padding: 0 4mm 4mm;
+      border-bottom: 0.45mm solid #333;
+      font-size: 18pt;
+      line-height: 1.2;
+      font-weight: 700;
+      text-align: center;
+      overflow-wrap: anywhere;
+    }
+
+    .page-content {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 0;
+      padding-top: var(--gap-y);
+      padding-bottom: 2mm;
+    }
+
+    .page-footer {
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+      color: #000;
+      font-size: 10.5pt;
+      line-height: 1.2;
+      text-align: center;
+    }
+
+    .photo-grid {
+      width: 100%;
+      height: 100%;
+      display: grid;
+      grid-template-columns: repeat(var(--cols, 2), minmax(0, 1fr));
+      grid-template-rows: repeat(var(--rows, 2), minmax(0, 1fr));
+      border-top: 0.4mm solid var(--line);
+      border-left: 0.4mm solid var(--line);
+      margin-left: auto;
+      margin-right: auto;
+      min-height: 0;
+    }
+
+    .photo-grid tbody,
+    .photo-grid tr {
+      display: contents;
+    }
+
+    .photo-grid colgroup {
+      display: none;
+    }
+
+    .photo-cell {
+      display: block;
+      min-width: 0;
+      min-height: 0;
+      border-right: 0.4mm solid var(--line);
+      border-bottom: 0.4mm solid var(--line);
+      padding: var(--cell-pad, 2.2mm);
+      vertical-align: middle;
+      text-align: center;
+      overflow: hidden;
+    }
+
+    .cell-box {
+      height: 100%;
+      width: 100%;
+      display: grid;
+      grid-template-rows: minmax(0, 1fr) auto;
+      gap: var(--cell-gap, 1.7mm);
+      align-items: stretch;
+      justify-items: center;
+      overflow: hidden;
+    }
+
+    .image-box {
+      width: 100%;
+      height: 100%;
+      min-height: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      background: #fff;
+    }
+
+    .image-box img {
+      display: block;
+      max-width: 100%;
+      max-height: 100%;
+      width: auto;
+      height: auto;
+      object-fit: contain;
+      image-rendering: auto;
+    }
+
+    .caption {
+      width: 100%;
+      min-height: var(--caption-h, 5.5mm);
+      color: #000;
+      font-size: var(--caption-font, 10.5pt);
+      line-height: 1.25;
+      text-align: center;
+      overflow: hidden;
+      overflow-wrap: anywhere;
+    }
+
+    .caption.empty {
+      min-height: 0;
+      display: none;
+    }
+
+    .placeholder {
+      display: grid;
+      place-items: center;
+      min-height: 20mm;
+      color: transparent;
+    }
+
+    @media (max-width: 980px) {
+      .app-shell {
+        grid-template-columns: 1fr;
+        height: auto;
+        min-height: 100vh;
+        padding: 12px;
+        overflow: visible;
+      }
+
+      .control-panel {
+        position: static;
+        max-height: none;
+        overflow: visible;
+      }
+
+      .page {
+        transform-origin: top center;
+        width: min(100%, var(--paper-w));
+        height: auto;
+        aspect-ratio: 210 / 297;
+      }
+
+      .preview-wrap {
+        height: auto;
+        overflow-x: auto;
+        overflow-y: visible;
+      }
+    }
+
+    @media print {
+      @page {
+        size: A4 portrait;
+        margin: 0;
+      }
+
+      html,
+      body {
+        width: var(--paper-w);
+        margin: 0;
+        padding: 0;
+        background: #fff;
+      }
+
+      body * {
+        visibility: hidden;
+      }
+
+      #report,
+      #report * {
+        visibility: visible;
+      }
+
+      .app-shell,
+      .preview-wrap,
+      #report {
+        display: block;
+        width: var(--paper-w);
+        margin: 0;
+        padding: 0;
+      }
+
+      .control-panel,
+      .preview-bar,
+      .empty-state {
+        display: none !important;
+      }
+
+      #report {
+        position: absolute;
+        left: 0;
+        top: 0;
+        background: #fff;
+      }
+
+      .page {
+        width: var(--paper-w);
+        height: var(--paper-h);
+        margin: 0;
+        box-shadow: none;
+        overflow: hidden;
+        break-after: page;
+        page-break-after: always;
+      }
+
+      .page:last-child {
+        break-after: auto;
+        page-break-after: auto;
+      }
+
+      .photo-cell {
+        break-inside: avoid;
+        page-break-inside: avoid;
+      }
+    }
+  </style>
+</head>
+<body class="print-duplex">
+  <main class="app-shell">
+    <section class="control-panel" aria-label="報表設定">
+      <div class="panel-head">
+        <h1>圖證彙整工具</h1>
+        <p>單一離線 HTML，支援 A4 直式、列印模式與 Word DOCX 匯出。</p>
+        <div class="maker-credit">製作人:永和偵查員葉哲宇 2026v1</div>
+      </div>
+
+      <div class="panel-body">
+        <div class="field">
+          <label for="imageInput">選取圖片</label>
+          <input id="imageInput" type="file" accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp" multiple>
+          <p class="hint">可一次選取多張 JPG、JPEG、PNG、WEBP 圖片。</p>
+        </div>
+
+        <div class="field">
+          <label for="reportTitle">報表標題</label>
+          <input id="reportTitle" type="text" value="圖證彙整" maxlength="80">
+        </div>
+
+        <div class="field">
+          <label for="wordTitle">Word 檔標題</label>
+          <input id="wordTitle" type="text" placeholder="留空則使用報表標題" maxlength="80">
+        </div>
+
+        <div class="field">
+          <div class="field-title">列印方式</div>
+          <div class="radio-grid">
+            <label><input type="radio" name="printMode" value="single"> 單面列印</label>
+            <label><input type="radio" name="printMode" value="duplex" checked> 雙面列印</label>
+          </div>
+          <p class="hint">單面每頁置中；雙面保留左右鏡像裝訂空間。</p>
+        </div>
+
+        <div class="inline-grid">
+          <div class="field">
+            <label for="cols">每頁欄數</label>
+            <select id="cols">
+              <option value="1">1 欄</option>
+              <option value="2" selected>2 欄</option>
+              <option value="3">3 欄</option>
+              <option value="4">4 欄</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label for="rows">每頁列數</label>
+            <select id="rows">
+              <option value="1">1 列</option>
+              <option value="2" selected>2 列</option>
+              <option value="3">3 列</option>
+              <option value="4">4 列</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="exportQuality">Word 匯出圖片品質</label>
+          <select id="exportQuality">
+            <option value="clear" selected>清楚優先（建議）</option>
+            <option value="small">較小檔案</option>
+            <option value="high">高解析（檔案較大）</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <div class="field-title">圖片下方標示</div>
+          <div class="radio-grid">
+            <label><input type="radio" name="captionMode" value="serial" checked> 流水編號</label>
+            <label><input type="radio" name="captionMode" value="name"> 檔名</label>
+            <label><input type="radio" name="captionMode" value="full"> 檔名含副檔名</label>
+            <label><input type="radio" name="captionMode" value="date"> 日期</label>
+            <label><input type="radio" name="captionMode" value="none"> 不顯示</label>
+          </div>
+        </div>
+
+        <div id="warning" class="warning" role="status"></div>
+
+        <div class="button-row">
+          <button id="printBtn" type="button">列印</button>
+          <button id="exportBtn" class="secondary" type="button">匯出 Word</button>
+        </div>
+
+        <div class="field">
+          <div class="field-title">已選圖片</div>
+          <div id="fileList" class="file-list">尚未選取圖片。</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="preview-wrap" aria-label="報表預覽">
+      <div class="preview-bar">
+        <span id="summary"><strong>0</strong> 張圖片，<strong>0</strong> 頁</span>
+        <span>A4 直式預覽</span>
+      </div>
+      <div id="report">
+        <div class="empty-state">請先選取圖片，預覽會顯示在這裡。</div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    (function () {
+      "use strict";
+
+      var imageInput = document.getElementById("imageInput");
+      var titleInput = document.getElementById("reportTitle");
+      var wordTitleInput = document.getElementById("wordTitle");
+      var colsSelect = document.getElementById("cols");
+      var rowsSelect = document.getElementById("rows");
+      var exportQualitySelect = document.getElementById("exportQuality");
+      var printModeInputs = document.querySelectorAll("input[name='printMode']");
+      var report = document.getElementById("report");
+      var summary = document.getElementById("summary");
+      var warning = document.getElementById("warning");
+      var fileList = document.getElementById("fileList");
+      var printBtn = document.getElementById("printBtn");
+      var exportBtn = document.getElementById("exportBtn");
+
+      var supportedTypes = {
+        "image/jpeg": true,
+        "image/png": true,
+        "image/webp": true
+      };
+
+      var images = [];
+      var objectUrls = [];
+      var exportProfiles = {
+        clear: { maxLongEdge: 2400, jpegQuality: 0.86 },
+        small: { maxLongEdge: 1700, jpegQuality: 0.78 },
+        high: { maxLongEdge: 3200, jpegQuality: 0.9 }
+      };
+      var wordLayout = {
+        pageWidth: 210,
+        pageHeight: 297,
+        padTop: 13,
+        padBottom: 12,
+        padOuter: 13,
+        binding: 15,
+        headerHeight: 15,
+        footerHeight: 8,
+        bodyGapTop: 3.5,
+        bodyGapBottom: 2,
+        cellPadding: 2.2,
+        captionHeight: 7,
+        docxBreakReserve: 18,
+        docxSafetyX: 6,
+        docxBottomRuleHeight: 4,
+        docxTableSlack: 5,
+        docxImageSlack: 1.2
+      };
+
+      function clearObjectUrls() {
+        objectUrls.forEach(function (url) {
+          URL.revokeObjectURL(url);
+        });
+        objectUrls = [];
+      }
+
+      function escapeHtml(value) {
+        return String(value)
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;")
+          .replace(/'/g, "&#39;");
+      }
+
+      function basenameWithoutExtension(name) {
+        return name.replace(/\.[^/.\\]+$/, "");
+      }
+
+      function pad2(number) {
+        return String(number).padStart(2, "0");
+      }
+
+      function formatDate(timestamp) {
+        var date = timestamp ? new Date(timestamp) : new Date();
+        if (isNaN(date.getTime())) {
+          date = new Date();
+        }
+        return [
+          date.getFullYear(),
+          pad2(date.getMonth() + 1),
+          pad2(date.getDate())
+        ].join("-");
+      }
+
+      function getCaptionMode() {
+        var selected = document.querySelector("input[name='captionMode']:checked");
+        return selected ? selected.value : "serial";
+      }
+
+      function getPrintMode() {
+        var selected = document.querySelector("input[name='printMode']:checked");
+        return selected ? selected.value : "duplex";
+      }
+
+      function isDuplexPrint() {
+        return getPrintMode() === "duplex";
+      }
+
+      function syncPrintModeClass() {
+        var duplex = isDuplexPrint();
+        document.body.classList.toggle("print-duplex", duplex);
+        document.body.classList.toggle("print-single", !duplex);
+      }
+
+      function getExportProfile() {
+        return exportProfiles[exportQualitySelect.value] || exportProfiles.clear;
+      }
+
+      function getWordTitle() {
+        return wordTitleInput.value.trim() || titleInput.value.trim() || "圖證彙整";
+      }
+
+      function safeFileName(value) {
+        var name = String(value || "圖證彙整")
+          .replace(/[\\/:*?"<>|]/g, "_")
+          .replace(/\s+/g, " ")
+          .trim();
+        return name || "圖證彙整";
+      }
+
+      function captionFor(item, index) {
+        var mode = getCaptionMode();
+        if (mode === "serial") {
+          return String(index + 1);
+        }
+        if (mode === "name") {
+          return basenameWithoutExtension(item.name);
+        }
+        if (mode === "full") {
+          return item.name;
+        }
+        if (mode === "date") {
+          return item.dateText;
+        }
+        return "";
+      }
+
+      function setWarning(message) {
+        warning.textContent = message || "";
+        warning.classList.toggle("is-visible", Boolean(message));
+      }
+
+      function renderFileList() {
+        if (!images.length) {
+          fileList.textContent = "尚未選取圖片。";
+          return;
+        }
+
+        var ol = document.createElement("ol");
+        images.forEach(function (item) {
+          var li = document.createElement("li");
+          li.textContent = item.name;
+          ol.appendChild(li);
+        });
+        fileList.innerHTML = "";
+        fileList.appendChild(ol);
+      }
+
+      function makeCell(item, index) {
+        var td = document.createElement("td");
+        td.className = "photo-cell";
+
+        var box = document.createElement("div");
+        box.className = "cell-box";
+
+        var imageBox = document.createElement("div");
+        imageBox.className = "image-box";
+
+        if (item) {
+          var img = document.createElement("img");
+          img.src = item.url;
+          img.alt = item.name;
+          imageBox.appendChild(img);
+        } else {
+          imageBox.className += " placeholder";
+          imageBox.textContent = ".";
+        }
+
+        var caption = document.createElement("div");
+        caption.className = "caption";
+
+        if (item) {
+          var text = captionFor(item, index);
+          if (text) {
+            caption.textContent = text;
+          } else {
+            caption.className += " empty";
+          }
+        } else {
+          caption.className += " empty";
+        }
+
+        box.appendChild(imageBox);
+        box.appendChild(caption);
+        td.appendChild(box);
+        return td;
+      }
+
+      function renderReport() {
+        syncPrintModeClass();
+
+        var cols = Number(colsSelect.value);
+        var rows = Number(rowsSelect.value);
+        var perPage = cols * rows;
+        var pageCount = images.length ? Math.ceil(images.length / perPage) : 0;
+        var title = titleInput.value.trim() || "圖證彙整";
+
+        summary.innerHTML = "<strong>" + images.length + "</strong> 張圖片，<strong>" + pageCount + "</strong> 頁";
+        report.innerHTML = "";
+
+        if (!images.length) {
+          var empty = document.createElement("div");
+          empty.className = "empty-state";
+          empty.textContent = "請先選取圖片，預覽會顯示在這裡。";
+          report.appendChild(empty);
+          return;
+        }
+
+        for (var pageIndex = 0; pageIndex < pageCount; pageIndex += 1) {
+          var page = document.createElement("article");
+          page.className = "page " + (pageIndex % 2 === 0 ? "odd" : "even");
+
+          var inner = document.createElement("div");
+          inner.className = "page-inner";
+
+          var header = document.createElement("header");
+          header.className = "page-header";
+          header.textContent = title;
+
+          var content = document.createElement("div");
+          content.className = "page-content";
+
+          var footer = document.createElement("footer");
+          footer.className = "page-footer";
+          footer.textContent = "第" + (pageIndex + 1) + "頁 共" + pageCount + "頁";
+
+          var table = document.createElement("table");
+          table.className = "photo-grid";
+          table.setAttribute("role", "presentation");
+          table.style.setProperty("--cols", String(cols));
+          table.style.setProperty("--rows", String(rows));
+          table.style.setProperty("--cell-pad", rows >= 4 ? "1.2mm" : (rows === 3 ? "1.6mm" : "2.2mm"));
+          table.style.setProperty("--cell-gap", rows >= 4 ? "0.7mm" : (rows === 3 ? "1mm" : "1.7mm"));
+          table.style.setProperty("--caption-h", rows >= 4 ? "3.8mm" : (rows === 3 ? "4.5mm" : "5.5mm"));
+          table.style.setProperty("--caption-font", rows >= 4 ? "8.5pt" : (rows === 3 ? "9.3pt" : "10.5pt"));
+
+          var colgroup = document.createElement("colgroup");
+          for (var c = 0; c < cols; c += 1) {
+            var col = document.createElement("col");
+            col.style.width = (100 / cols) + "%";
+            colgroup.appendChild(col);
+          }
+          table.appendChild(colgroup);
+
+          var tbody = document.createElement("tbody");
+          for (var r = 0; r < rows; r += 1) {
+            var tr = document.createElement("tr");
+            tr.style.height = (100 / rows) + "%";
+            for (var cc = 0; cc < cols; cc += 1) {
+              var imageIndex = pageIndex * perPage + r * cols + cc;
+              tr.appendChild(makeCell(images[imageIndex], imageIndex));
+            }
+            tbody.appendChild(tr);
+          }
+          table.appendChild(tbody);
+          content.appendChild(table);
+          inner.appendChild(header);
+          inner.appendChild(content);
+          inner.appendChild(footer);
+          page.appendChild(inner);
+          report.appendChild(page);
+        }
+      }
+
+      function readFileAsDataUrl(file) {
+        return new Promise(function (resolve, reject) {
+          var reader = new FileReader();
+          reader.onload = function () {
+            resolve(reader.result);
+          };
+          reader.onerror = function () {
+            reject(reader.error || new Error("讀取檔案失敗"));
+          };
+          reader.readAsDataURL(file);
+        });
+      }
+
+      function estimateDataUrlBytes(dataUrl) {
+        var payload = base64Payload(dataUrl);
+        var padding = payload.endsWith("==") ? 2 : (payload.endsWith("=") ? 1 : 0);
+        return Math.max(0, Math.floor(payload.length * 3 / 4) - padding);
+      }
+
+      function compressImageForWord(item) {
+        return new Promise(function (resolve, reject) {
+          var img = new Image();
+          img.onload = function () {
+            try {
+              var originalWidth = img.naturalWidth || img.width;
+              var originalHeight = img.naturalHeight || img.height;
+              if (!originalWidth || !originalHeight) {
+                reject(new Error("圖片尺寸讀取失敗"));
+                return;
+              }
+
+              var profile = getExportProfile();
+              var scale = Math.min(1, profile.maxLongEdge / Math.max(originalWidth, originalHeight));
+              var targetWidth = Math.max(1, Math.round(originalWidth * scale));
+              var targetHeight = Math.max(1, Math.round(originalHeight * scale));
+              var canvas = document.createElement("canvas");
+              canvas.width = targetWidth;
+              canvas.height = targetHeight;
+              var context = canvas.getContext("2d");
+              context.imageSmoothingEnabled = true;
+              context.imageSmoothingQuality = "high";
+              context.fillStyle = "#ffffff";
+              context.fillRect(0, 0, canvas.width, canvas.height);
+              context.drawImage(img, 0, 0, targetWidth, targetHeight);
+              var dataUrl = canvas.toDataURL("image/jpeg", profile.jpegQuality);
+              resolve({
+                dataUrl: dataUrl,
+                bytes: estimateDataUrlBytes(dataUrl),
+                width: targetWidth,
+                height: targetHeight,
+                originalWidth: originalWidth,
+                originalHeight: originalHeight
+              });
+            } catch (error) {
+              reject(error);
+            }
+          };
+          img.onerror = function () {
+            reject(new Error("圖片轉換失敗"));
+          };
+          img.src = item.url;
+        });
+      }
+
+      async function getExportImageInfo(item) {
+        var compressed = await compressImageForWord(item);
+        var mustConvert = item.file.type === "image/webp" || /\.webp$/i.test(item.name);
+
+        if (!mustConvert && compressed.bytes >= item.file.size * 0.98) {
+          return {
+            dataUrl: await readFileAsDataUrl(item.file),
+            bytes: item.file.size,
+            width: compressed.originalWidth,
+            height: compressed.originalHeight
+          };
+        }
+
+        return {
+          dataUrl: compressed.dataUrl,
+          bytes: compressed.bytes,
+          width: compressed.width,
+          height: compressed.height
+        };
+      }
+
+      function handleFiles(files) {
+        clearObjectUrls();
+        setWarning("");
+
+        var accepted = [];
+        var rejected = [];
+
+        Array.prototype.forEach.call(files, function (file) {
+          var nameOk = /\.(jpe?g|png|webp)$/i.test(file.name);
+          var typeOk = supportedTypes[file.type] || file.type === "";
+          if (nameOk && typeOk) {
+            accepted.push(file);
+          } else {
+            rejected.push(file.name);
+          }
+        });
+
+        images = accepted.map(function (file) {
+          var url = URL.createObjectURL(file);
+          objectUrls.push(url);
+          return {
+            file: file,
+            name: file.name,
+            url: url,
+            dateText: formatDate(file.lastModified)
+          };
+        });
+
+        if (rejected.length) {
+          setWarning("已略過不支援的檔案：" + rejected.join("、"));
+        }
+
+        renderFileList();
+        renderReport();
+      }
+
+      function fitImageSize(width, height, maxWidth, maxHeight) {
+        if (!width || !height) {
+          return { width: maxWidth, height: maxHeight };
+        }
+        var scale = Math.min(maxWidth / width, maxHeight / height);
+        return {
+          width: Math.max(1, width * scale),
+          height: Math.max(1, height * scale)
+        };
+      }
+
+      function extensionForDataUrl(dataUrl) {
+        var match = /^data:([^;,]+);base64,/i.exec(dataUrl);
+        var type = match ? match[1].toLowerCase() : "";
+        if (type === "image/jpeg") {
+          return "jpg";
+        }
+        if (type === "image/png") {
+          return "png";
+        }
+        if (type === "image/webp") {
+          return "webp";
+        }
+        return "img";
+      }
+
+      function base64Payload(dataUrl) {
+        return String(dataUrl).replace(/^data:[^;,]+;base64,/i, "");
+      }
+
+      function xml(value) {
+        return escapeHtml(value);
+      }
+
+      function twip(valueMm) {
+        return Math.round(valueMm * 1440 / 25.4);
+      }
+
+      function emu(valueMm) {
+        return Math.round(valueMm * 36000);
+      }
+
+      function getDocxMetrics(cols, rows) {
+        var bindingWidth = isDuplexPrint() ? wordLayout.binding : 0;
+        var contentWidth = wordLayout.pageWidth - (wordLayout.padOuter * 2) - bindingWidth - wordLayout.docxSafetyX;
+        var contentHeight = wordLayout.pageHeight - wordLayout.padTop - wordLayout.padBottom - wordLayout.docxBreakReserve;
+        var bodyHeight = contentHeight - wordLayout.headerHeight - wordLayout.footerHeight;
+        var photoRowsHeight = bodyHeight - wordLayout.bodyGapTop - wordLayout.bodyGapBottom - wordLayout.docxBottomRuleHeight - wordLayout.docxTableSlack;
+        var photoTableHeight = photoRowsHeight + wordLayout.docxBottomRuleHeight;
+        var cellWidth = contentWidth / cols;
+        var cellHeight = photoRowsHeight / rows;
+        var hasCaption = getCaptionMode() !== "none";
+        var compactCaption = cols >= 4 || rows >= 4;
+        var mediumCaption = cols >= 3 || rows >= 3;
+        var captionHeight = hasCaption ? (compactCaption ? 5 : (mediumCaption ? 6 : wordLayout.captionHeight)) : 0;
+        var captionFontSize = compactCaption ? 14 : (mediumCaption ? 16 : 18);
+        var innerWidth = Math.max(5, cellWidth - wordLayout.cellPadding * 2);
+        var innerHeight = Math.max(5, cellHeight - wordLayout.cellPadding * 2);
+        var imageAreaHeight = Math.max(5, innerHeight - captionHeight);
+
+        return {
+          contentWidth: contentWidth,
+          contentHeight: contentHeight,
+          bodyHeight: bodyHeight,
+          photoTableHeight: photoTableHeight,
+          cellWidth: cellWidth,
+          cellHeight: cellHeight,
+          innerWidth: innerWidth,
+          innerHeight: innerHeight,
+          imageAreaHeight: imageAreaHeight,
+          captionHeight: captionHeight,
+          captionFontSize: captionFontSize,
+          bottomRuleHeight: wordLayout.docxBottomRuleHeight,
+          hasCaption: hasCaption
+        };
+      }
+
+      function tcMargins(top, right, bottom, left) {
+        return "<w:tcMar>" +
+          "<w:top w:w='" + twip(top) + "' w:type='dxa'/>" +
+          "<w:right w:w='" + twip(right) + "' w:type='dxa'/>" +
+          "<w:bottom w:w='" + twip(bottom) + "' w:type='dxa'/>" +
+          "<w:left w:w='" + twip(left) + "' w:type='dxa'/>" +
+          "</w:tcMar>";
+      }
+
+      function noBorders() {
+        return "<w:tcBorders>" +
+          "<w:top w:val='nil'/><w:left w:val='nil'/><w:bottom w:val='nil'/><w:right w:val='nil'/>" +
+          "</w:tcBorders>";
+      }
+
+      function tableBorders() {
+        var edge = " w:val='single' w:sz='8' w:space='0' w:color='222222'";
+        return "<w:tblBorders>" +
+          "<w:top" + edge + "/><w:left" + edge + "/><w:bottom" + edge + "/><w:right" + edge + "/>" +
+          "<w:insideH" + edge + "/><w:insideV" + edge + "/>" +
+          "</w:tblBorders>";
+      }
+
+      function gridBorders(bottomSize) {
+        var edge = " w:val='single' w:sz='6' w:space='0' w:color='222222'";
+        var bottom = " w:val='single' w:sz='" + (bottomSize || 6) + "' w:space='0' w:color='222222'";
+        return "<w:tcBorders>" +
+          "<w:top" + edge + "/><w:left" + edge + "/><w:bottom" + bottom + "/><w:right" + edge + "/>" +
+          "</w:tcBorders>";
+      }
+
+      function bottomRuleBorders() {
+        return "<w:tcBorders>" +
+          "<w:top w:val='single' w:sz='12' w:space='0' w:color='222222'/>" +
+          "<w:left w:val='nil'/><w:bottom w:val='single' w:sz='12' w:space='0' w:color='222222'/><w:right w:val='nil'/>" +
+          "</w:tcBorders>";
+      }
+
+      function emptyParagraph() {
+        return "<w:p><w:pPr><w:spacing w:before='0' w:after='0' w:line='1' w:lineRule='exact'/></w:pPr></w:p>";
+      }
+
+      function textParagraph(text, options) {
+        var opts = options || {};
+        var size = opts.size || 21;
+        var runProps = "<w:rPr><w:rFonts w:ascii='Microsoft JhengHei' w:hAnsi='Microsoft JhengHei' w:eastAsia='Microsoft JhengHei'/>" +
+          (opts.bold ? "<w:b/><w:bCs/>" : "") +
+          "<w:sz w:val='" + size + "'/><w:szCs w:val='" + size + "'/></w:rPr>";
+        var spacing = "<w:spacing w:before='0' w:after='0'" + (opts.line ? " w:line='" + opts.line + "' w:lineRule='exact'" : "") + "/>";
+        var paraProps = "<w:pPr>" +
+          "<w:jc w:val='" + (opts.align || "center") + "'/>" +
+          spacing +
+          "</w:pPr>";
+        return "<w:p>" + paraProps + "<w:r>" + runProps + "<w:t xml:space='preserve'>" + xml(text) + "</w:t></w:r></w:p>";
+      }
+
+      function pageBreakParagraph() {
+        return "<w:p><w:pPr><w:spacing w:before='0' w:after='0' w:line='1' w:lineRule='exact'/></w:pPr><w:r><w:br w:type='page'/></w:r></w:p>";
+      }
+
+      function drawingXml(imageInfo, item, imageIndex, widthMm, heightMm) {
+        var id = imageIndex + 1;
+        var cx = emu(widthMm);
+        var cy = emu(heightMm);
+        var name = xml(item.name || ("image" + id));
+        return "<w:r><w:drawing><wp:inline distT='0' distB='0' distL='0' distR='0'>" +
+          "<wp:extent cx='" + cx + "' cy='" + cy + "'/>" +
+          "<wp:effectExtent l='0' t='0' r='0' b='0'/>" +
+          "<wp:docPr id='" + id + "' name='圖片 " + id + "' descr='" + name + "'/>" +
+          "<wp:cNvGraphicFramePr><a:graphicFrameLocks noChangeAspect='1'/></wp:cNvGraphicFramePr>" +
+          "<a:graphic><a:graphicData uri='http://schemas.openxmlformats.org/drawingml/2006/picture'>" +
+          "<pic:pic><pic:nvPicPr><pic:cNvPr id='" + id + "' name='" + name + "'/><pic:cNvPicPr/></pic:nvPicPr>" +
+          "<pic:blipFill><a:blip r:embed='" + imageInfo.relId + "'/><a:stretch><a:fillRect/></a:stretch></pic:blipFill>" +
+          "<pic:spPr><a:xfrm><a:off x='0' y='0'/><a:ext cx='" + cx + "' cy='" + cy + "'/></a:xfrm><a:prstGeom prst='rect'><a:avLst/></a:prstGeom></pic:spPr>" +
+          "</pic:pic></a:graphicData></a:graphic>" +
+          "</wp:inline></w:drawing></w:r>";
+      }
+
+      function imageParagraph(imageInfo, item, imageIndex, widthMm, heightMm) {
+        return "<w:p><w:pPr><w:jc w:val='center'/><w:spacing w:before='0' w:after='0'/></w:pPr>" +
+          drawingXml(imageInfo, item, imageIndex, widthMm, heightMm) +
+          "</w:p>";
+      }
+
+      function buildDocxPhotoCell(item, imageInfo, imageIndex, metrics, isLastRow) {
+        var cellWidth = twip(metrics.cellWidth);
+        var cellHeight = twip(metrics.cellHeight);
+        var innerWidth = twip(metrics.innerWidth);
+        var imageAreaHeight = twip(metrics.imageAreaHeight);
+        var captionHeight = twip(metrics.captionHeight);
+        var caption = item && metrics.hasCaption ? captionFor(item, imageIndex) : "";
+
+        var cell = [
+          "<w:tc>",
+          "<w:tcPr><w:tcW w:w='" + cellWidth + "' w:type='dxa'/>" +
+            gridBorders(isLastRow ? 14 : 6) +
+            tcMargins(wordLayout.cellPadding, wordLayout.cellPadding, wordLayout.cellPadding, wordLayout.cellPadding) +
+            "<w:vAlign w:val='center'/></w:tcPr>"
+        ];
+
+        if (!item || !imageInfo) {
+          cell.push(emptyParagraph(), "</w:tc>");
+          return cell.join("");
+        }
+
+        var fitWidth = Math.max(5, metrics.innerWidth - wordLayout.docxImageSlack);
+        var fitHeight = Math.max(5, metrics.imageAreaHeight - wordLayout.docxImageSlack);
+        var fitted = fitImageSize(imageInfo.width, imageInfo.height, fitWidth, fitHeight);
+        cell.push("<w:tbl><w:tblPr><w:tblW w:w='" + innerWidth + "' w:type='dxa'/><w:tblLayout w:type='fixed'/><w:tblCellMar><w:top w:w='0' w:type='dxa'/><w:left w:w='0' w:type='dxa'/><w:bottom w:w='0' w:type='dxa'/><w:right w:w='0' w:type='dxa'/></w:tblCellMar></w:tblPr>");
+        cell.push("<w:tblGrid><w:gridCol w:w='" + innerWidth + "'/></w:tblGrid>");
+        cell.push("<w:tr><w:trPr><w:cantSplit/><w:trHeight w:val='" + imageAreaHeight + "' w:hRule='exact'/></w:trPr>");
+        cell.push("<w:tc><w:tcPr><w:tcW w:w='" + innerWidth + "' w:type='dxa'/>" + noBorders() + tcMargins(0, 0, 0, 0) + "<w:vAlign w:val='center'/></w:tcPr>");
+        cell.push(imageParagraph(imageInfo, item, imageIndex, fitted.width, fitted.height));
+        cell.push("</w:tc></w:tr>");
+
+        if (caption) {
+          cell.push("<w:tr><w:trPr><w:cantSplit/><w:trHeight w:val='" + captionHeight + "' w:hRule='exact'/></w:trPr>");
+          cell.push("<w:tc><w:tcPr><w:tcW w:w='" + innerWidth + "' w:type='dxa'/>" + noBorders() + tcMargins(0, 0, 0, 0) + "<w:noWrap/><w:vAlign w:val='center'/></w:tcPr>");
+          cell.push(textParagraph(caption, { size: metrics.captionFontSize, align: "center", line: Math.max(120, metrics.captionFontSize * 10) }));
+          cell.push("</w:tc></w:tr>");
+        }
+
+        cell.push("</w:tbl>");
+        cell.push(emptyParagraph());
+        cell.push("</w:tc>");
+        return cell.join("");
+      }
+
+      function buildDocxBottomRuleRow(metrics, cols) {
+        var row = [
+          "<w:tr><w:trPr><w:cantSplit/><w:trHeight w:val='" + twip(metrics.bottomRuleHeight) + "' w:hRule='exact'/></w:trPr>"
+        ];
+        for (var col = 0; col < cols; col += 1) {
+          row.push("<w:tc><w:tcPr><w:tcW w:w='" + twip(metrics.cellWidth) + "' w:type='dxa'/>" +
+            bottomRuleBorders() + tcMargins(0, 0, 0, 0) + "<w:vAlign w:val='top'/></w:tcPr>" +
+            emptyParagraph() +
+            "</w:tc>");
+        }
+        row.push("</w:tr>");
+        return row.join("");
+      }
+
+      function buildDocxPhotoTable(pageIndex, imageInfos, metrics, cols, rows, perPage) {
+        var html = [
+          "<w:tbl><w:tblPr><w:tblW w:w='" + twip(metrics.contentWidth) + "' w:type='dxa'/><w:jc w:val='center'/>" + tableBorders() + "<w:tblLayout w:type='fixed'/><w:tblCellMar><w:top w:w='0' w:type='dxa'/><w:left w:w='0' w:type='dxa'/><w:bottom w:w='0' w:type='dxa'/><w:right w:w='0' w:type='dxa'/></w:tblCellMar></w:tblPr>",
+          "<w:tblGrid>"
+        ];
+        for (var c = 0; c < cols; c += 1) {
+          html.push("<w:gridCol w:w='" + twip(metrics.cellWidth) + "'/>");
+        }
+        html.push("</w:tblGrid>");
+
+        for (var r = 0; r < rows; r += 1) {
+          html.push("<w:tr><w:trPr><w:cantSplit/><w:trHeight w:val='" + twip(metrics.cellHeight) + "' w:hRule='exact'/></w:trPr>");
+          for (var col = 0; col < cols; col += 1) {
+            var imageIndex = pageIndex * perPage + r * cols + col;
+            html.push(buildDocxPhotoCell(images[imageIndex], imageInfos[imageIndex], imageIndex, metrics, r === rows - 1));
+          }
+          html.push("</w:tr>");
+        }
+
+        html.push(buildDocxBottomRuleRow(metrics, cols));
+        html.push("</w:tbl>");
+        return html.join("");
+      }
+
+      function buildDocxPage(pageIndex, pageCount, imageInfos, metrics, cols, rows, perPage) {
+        var title = getWordTitle();
+        var contentWidth = twip(metrics.contentWidth);
+        var contentHeight = twip(metrics.contentHeight);
+        var bodyHeight = twip(metrics.bodyHeight);
+        var footerText = "第" + (pageIndex + 1) + "頁 共" + pageCount + "頁";
+
+        return [
+          "<w:tbl><w:tblPr><w:tblW w:w='" + contentWidth + "' w:type='dxa'/><w:jc w:val='center'/><w:tblLayout w:type='fixed'/><w:tblCellMar><w:top w:w='0' w:type='dxa'/><w:left w:w='0' w:type='dxa'/><w:bottom w:w='0' w:type='dxa'/><w:right w:w='0' w:type='dxa'/></w:tblCellMar></w:tblPr>",
+          "<w:tblGrid><w:gridCol w:w='" + contentWidth + "'/></w:tblGrid>",
+          "<w:tr><w:trPr><w:cantSplit/><w:trHeight w:val='" + twip(wordLayout.headerHeight) + "' w:hRule='exact'/></w:trPr>",
+          "<w:tc><w:tcPr><w:tcW w:w='" + contentWidth + "' w:type='dxa'/>" +
+            "<w:tcBorders><w:top w:val='nil'/><w:left w:val='nil'/><w:right w:val='nil'/><w:bottom w:val='single' w:sz='10' w:space='0' w:color='333333'/></w:tcBorders>" +
+            tcMargins(0, 4, 3, 4) + "<w:vAlign w:val='top'/></w:tcPr>" +
+            textParagraph(title, { size: 36, bold: true, align: "center" }) + "</w:tc></w:tr>",
+          "<w:tr><w:trPr><w:cantSplit/><w:trHeight w:val='" + bodyHeight + "' w:hRule='exact'/></w:trPr>",
+          "<w:tc><w:tcPr><w:tcW w:w='" + contentWidth + "' w:type='dxa'/>" + noBorders() + tcMargins(wordLayout.bodyGapTop, 0, wordLayout.bodyGapBottom, 0) + "<w:vAlign w:val='center'/></w:tcPr>",
+          buildDocxPhotoTable(pageIndex, imageInfos, metrics, cols, rows, perPage),
+          emptyParagraph(),
+          "</w:tc></w:tr>",
+          "<w:tr><w:trPr><w:cantSplit/><w:trHeight w:val='" + twip(wordLayout.footerHeight) + "' w:hRule='exact'/></w:trPr>",
+          "<w:tc><w:tcPr><w:tcW w:w='" + contentWidth + "' w:type='dxa'/>" + noBorders() + tcMargins(0, 0, 0, 0) + "<w:vAlign w:val='bottom'/></w:tcPr>" +
+            textParagraph(footerText, { size: 21, align: "center" }) + "</w:tc></w:tr>",
+          "</w:tbl>"
+        ].join("");
+      }
+
+      function buildDocumentXml(imageInfos) {
+        var cols = Number(colsSelect.value);
+        var rows = Number(rowsSelect.value);
+        var perPage = cols * rows;
+        var pageCount = images.length ? Math.ceil(images.length / perPage) : 0;
+        var metrics = getDocxMetrics(cols, rows);
+        var margins = isDuplexPrint()
+          ? { left: wordLayout.padOuter + wordLayout.binding, right: wordLayout.padOuter }
+          : { left: wordLayout.padOuter, right: wordLayout.padOuter };
+        var body = [];
+
+        for (var pageIndex = 0; pageIndex < pageCount; pageIndex += 1) {
+          body.push(buildDocxPage(pageIndex, pageCount, imageInfos, metrics, cols, rows, perPage));
+          if (pageIndex < pageCount - 1) {
+            body.push(pageBreakParagraph());
+          }
+        }
+
+        body.push("<w:sectPr><w:pgSz w:w='" + twip(wordLayout.pageWidth) + "' w:h='" + twip(wordLayout.pageHeight) + "'/>" +
+          "<w:pgMar w:top='" + twip(wordLayout.padTop) + "' w:right='" + twip(margins.right) + "' w:bottom='" + twip(wordLayout.padBottom) + "' w:left='" + twip(margins.left) + "' w:header='0' w:footer='0' w:gutter='0'/>" +
+          "<w:cols w:space='720'/><w:docGrid w:linePitch='360'/></w:sectPr>");
+
+        return "<?xml version='1.0' encoding='UTF-8' standalone='yes'?>" +
+          "<w:document xmlns:w='http://schemas.openxmlformats.org/wordprocessingml/2006/main' " +
+          "xmlns:r='http://schemas.openxmlformats.org/officeDocument/2006/relationships' " +
+          "xmlns:wp='http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing' " +
+          "xmlns:a='http://schemas.openxmlformats.org/drawingml/2006/main' " +
+          "xmlns:pic='http://schemas.openxmlformats.org/drawingml/2006/picture'>" +
+          "<w:body>" + body.join("") + "</w:body></w:document>";
+      }
+
+      function buildDocumentRels(imageInfos) {
+        var rels = [
+          "<?xml version='1.0' encoding='UTF-8' standalone='yes'?>",
+          "<Relationships xmlns='http://schemas.openxmlformats.org/package/2006/relationships'>",
+          "<Relationship Id='rIdStyles' Type='http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles' Target='styles.xml'/>",
+          "<Relationship Id='rIdSettings' Type='http://schemas.openxmlformats.org/officeDocument/2006/relationships/settings' Target='settings.xml'/>"
+        ];
+        imageInfos.forEach(function (imageInfo) {
+          rels.push("<Relationship Id='" + imageInfo.relId + "' Type='http://schemas.openxmlformats.org/officeDocument/2006/relationships/image' Target='media/" + imageInfo.partName + "'/>");
+        });
+        rels.push("</Relationships>");
+        return rels.join("");
+      }
+
+      function buildContentTypes(imageInfos) {
+        var seen = {};
+        imageInfos.forEach(function (imageInfo) {
+          seen[imageInfo.extension] = true;
+        });
+        var defaults = [
+          "<Default Extension='rels' ContentType='application/vnd.openxmlformats-package.relationships+xml'/>",
+          "<Default Extension='xml' ContentType='application/xml'/>"
+        ];
+        if (seen.jpg || seen.jpeg) {
+          defaults.push("<Default Extension='jpg' ContentType='image/jpeg'/>");
+          defaults.push("<Default Extension='jpeg' ContentType='image/jpeg'/>");
+        }
+        if (seen.png) {
+          defaults.push("<Default Extension='png' ContentType='image/png'/>");
+        }
+
+        return "<?xml version='1.0' encoding='UTF-8' standalone='yes'?>" +
+          "<Types xmlns='http://schemas.openxmlformats.org/package/2006/content-types'>" +
+          defaults.join("") +
+          "<Override PartName='/word/document.xml' ContentType='application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml'/>" +
+          "<Override PartName='/word/styles.xml' ContentType='application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml'/>" +
+          "<Override PartName='/word/settings.xml' ContentType='application/vnd.openxmlformats-officedocument.wordprocessingml.settings+xml'/>" +
+          "<Override PartName='/docProps/core.xml' ContentType='application/vnd.openxmlformats-package.core-properties+xml'/>" +
+          "<Override PartName='/docProps/app.xml' ContentType='application/vnd.openxmlformats-officedocument.extended-properties+xml'/>" +
+          "</Types>";
+      }
+
+      function buildStylesXml() {
+        return "<?xml version='1.0' encoding='UTF-8' standalone='yes'?>" +
+          "<w:styles xmlns:w='http://schemas.openxmlformats.org/wordprocessingml/2006/main'>" +
+          "<w:style w:type='paragraph' w:default='1' w:styleId='Normal'><w:name w:val='Normal'/>" +
+          "<w:qFormat/><w:pPr><w:spacing w:before='0' w:after='0'/></w:pPr>" +
+          "<w:rPr><w:rFonts w:ascii='Microsoft JhengHei' w:hAnsi='Microsoft JhengHei' w:eastAsia='Microsoft JhengHei'/><w:sz w:val='21'/><w:szCs w:val='21'/></w:rPr>" +
+          "</w:style></w:styles>";
+      }
+
+      function buildSettingsXml() {
+        var mirrorMargins = isDuplexPrint() ? "<w:mirrorMargins/>" : "";
+        return "<?xml version='1.0' encoding='UTF-8' standalone='yes'?>" +
+          "<w:settings xmlns:w='http://schemas.openxmlformats.org/wordprocessingml/2006/main'>" + mirrorMargins + "<w:compat><w:compatSetting w:name='compatibilityMode' w:uri='http://schemas.microsoft.com/office/word' w:val='15'/></w:compat></w:settings>";
+      }
+
+      function buildRootRels() {
+        return "<?xml version='1.0' encoding='UTF-8' standalone='yes'?>" +
+          "<Relationships xmlns='http://schemas.openxmlformats.org/package/2006/relationships'>" +
+          "<Relationship Id='rId1' Type='http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument' Target='word/document.xml'/>" +
+          "<Relationship Id='rId2' Type='http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties' Target='docProps/core.xml'/>" +
+          "<Relationship Id='rId3' Type='http://schemas.openxmlformats.org/officeDocument/2006/relationships/extended-properties' Target='docProps/app.xml'/>" +
+          "</Relationships>";
+      }
+
+      function buildCoreProps() {
+        var now = new Date().toISOString();
+        var title = xml(getWordTitle());
+        return "<?xml version='1.0' encoding='UTF-8' standalone='yes'?>" +
+          "<cp:coreProperties xmlns:cp='http://schemas.openxmlformats.org/package/2006/metadata/core-properties' xmlns:dc='http://purl.org/dc/elements/1.1/' xmlns:dcterms='http://purl.org/dc/terms/' xmlns:dcmitype='http://purl.org/dc/dcmitype/' xmlns:xsi='http://www.w3.org/2001/XMLSchema-instance'>" +
+          "<dc:title>" + title + "</dc:title><dc:creator>圖證彙整工具</dc:creator><cp:lastModifiedBy>圖證彙整工具</cp:lastModifiedBy>" +
+          "<dcterms:created xsi:type='dcterms:W3CDTF'>" + now + "</dcterms:created><dcterms:modified xsi:type='dcterms:W3CDTF'>" + now + "</dcterms:modified>" +
+          "</cp:coreProperties>";
+      }
+
+      function buildAppProps() {
+        return "<?xml version='1.0' encoding='UTF-8' standalone='yes'?>" +
+          "<Properties xmlns='http://schemas.openxmlformats.org/officeDocument/2006/extended-properties' xmlns:vt='http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes'>" +
+          "<Application>圖證彙整工具</Application><DocSecurity>0</DocSecurity><ScaleCrop>false</ScaleCrop><LinksUpToDate>false</LinksUpToDate><SharedDoc>false</SharedDoc><HyperlinksChanged>false</HyperlinksChanged><AppVersion>16.0000</AppVersion>" +
+          "</Properties>";
+      }
+
+      function base64ToBytes(dataUrl) {
+        var binary = atob(base64Payload(dataUrl));
+        var bytes = new Uint8Array(binary.length);
+        for (var i = 0; i < binary.length; i += 1) {
+          bytes[i] = binary.charCodeAt(i);
+        }
+        return bytes;
+      }
+
+      var crcTable = null;
+
+      function getCrcTable() {
+        if (crcTable) {
+          return crcTable;
+        }
+        crcTable = new Uint32Array(256);
+        for (var n = 0; n < 256; n += 1) {
+          var c = n;
+          for (var k = 0; k < 8; k += 1) {
+            c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
+          }
+          crcTable[n] = c >>> 0;
+        }
+        return crcTable;
+      }
+
+      function crc32(bytes) {
+        var table = getCrcTable();
+        var crc = 0xffffffff;
+        for (var i = 0; i < bytes.length; i += 1) {
+          crc = table[(crc ^ bytes[i]) & 0xff] ^ (crc >>> 8);
+        }
+        return (crc ^ 0xffffffff) >>> 0;
+      }
+
+      function dosDateTime(date) {
+        var year = Math.max(1980, date.getFullYear());
+        var time = (date.getHours() << 11) | (date.getMinutes() << 5) | Math.floor(date.getSeconds() / 2);
+        var day = (year - 1980) << 9 | ((date.getMonth() + 1) << 5) | date.getDate();
+        return { time: time, date: day };
+      }
+
+      function concatBytes(parts) {
+        var total = parts.reduce(function (sum, part) {
+          return sum + part.length;
+        }, 0);
+        var result = new Uint8Array(total);
+        var offset = 0;
+        parts.forEach(function (part) {
+          result.set(part, offset);
+          offset += part.length;
+        });
+        return result;
+      }
+
+      function makeZip(entries) {
+        var encoder = new TextEncoder();
+        var now = dosDateTime(new Date());
+        var locals = [];
+        var centrals = [];
+        var offset = 0;
+
+        entries.forEach(function (entry) {
+          var nameBytes = encoder.encode(entry.name);
+          var data = typeof entry.data === "string" ? encoder.encode(entry.data) : entry.data;
+          var crc = crc32(data);
+
+          var local = new Uint8Array(30 + nameBytes.length);
+          var localView = new DataView(local.buffer);
+          localView.setUint32(0, 0x04034b50, true);
+          localView.setUint16(4, 20, true);
+          localView.setUint16(6, 0x0800, true);
+          localView.setUint16(8, 0, true);
+          localView.setUint16(10, now.time, true);
+          localView.setUint16(12, now.date, true);
+          localView.setUint32(14, crc, true);
+          localView.setUint32(18, data.length, true);
+          localView.setUint32(22, data.length, true);
+          localView.setUint16(26, nameBytes.length, true);
+          localView.setUint16(28, 0, true);
+          local.set(nameBytes, 30);
+          locals.push(local, data);
+
+          var central = new Uint8Array(46 + nameBytes.length);
+          var centralView = new DataView(central.buffer);
+          centralView.setUint32(0, 0x02014b50, true);
+          centralView.setUint16(4, 20, true);
+          centralView.setUint16(6, 20, true);
+          centralView.setUint16(8, 0x0800, true);
+          centralView.setUint16(10, 0, true);
+          centralView.setUint16(12, now.time, true);
+          centralView.setUint16(14, now.date, true);
+          centralView.setUint32(16, crc, true);
+          centralView.setUint32(20, data.length, true);
+          centralView.setUint32(24, data.length, true);
+          centralView.setUint16(28, nameBytes.length, true);
+          centralView.setUint16(30, 0, true);
+          centralView.setUint16(32, 0, true);
+          centralView.setUint16(34, 0, true);
+          centralView.setUint16(36, 0, true);
+          centralView.setUint32(38, 0, true);
+          centralView.setUint32(42, offset, true);
+          central.set(nameBytes, 46);
+          centrals.push(central);
+
+          offset += local.length + data.length;
+        });
+
+        var centralOffset = offset;
+        var centralSize = centrals.reduce(function (sum, part) {
+          return sum + part.length;
+        }, 0);
+        var end = new Uint8Array(22);
+        var endView = new DataView(end.buffer);
+        endView.setUint32(0, 0x06054b50, true);
+        endView.setUint16(4, 0, true);
+        endView.setUint16(6, 0, true);
+        endView.setUint16(8, entries.length, true);
+        endView.setUint16(10, entries.length, true);
+        endView.setUint32(12, centralSize, true);
+        endView.setUint32(16, centralOffset, true);
+        endView.setUint16(20, 0, true);
+
+        return concatBytes(locals.concat(centrals, [end]));
+      }
+
+      function buildDocxBlob(imageInfos) {
+        imageInfos.forEach(function (imageInfo, index) {
+          imageInfo.extension = extensionForDataUrl(imageInfo.dataUrl);
+          if (imageInfo.extension === "jpeg") {
+            imageInfo.extension = "jpg";
+          }
+          imageInfo.relId = "rId" + (index + 1);
+          imageInfo.partName = "image" + String(index + 1).padStart(3, "0") + "." + imageInfo.extension;
+        });
+
+        var entries = [
+          { name: "[Content_Types].xml", data: buildContentTypes(imageInfos) },
+          { name: "_rels/.rels", data: buildRootRels() },
+          { name: "docProps/core.xml", data: buildCoreProps() },
+          { name: "docProps/app.xml", data: buildAppProps() },
+          { name: "word/document.xml", data: buildDocumentXml(imageInfos) },
+          { name: "word/styles.xml", data: buildStylesXml() },
+          { name: "word/settings.xml", data: buildSettingsXml() },
+          { name: "word/_rels/document.xml.rels", data: buildDocumentRels(imageInfos) }
+        ];
+
+        imageInfos.forEach(function (imageInfo) {
+          entries.push({
+            name: "word/media/" + imageInfo.partName,
+            data: base64ToBytes(imageInfo.dataUrl)
+          });
+        });
+
+        return new Blob([makeZip(entries)], { type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" });
+      }
+
+      function formatBytes(bytes) {
+        if (!bytes) {
+          return "0 MB";
+        }
+        return (bytes / 1024 / 1024).toFixed(bytes >= 10 * 1024 * 1024 ? 1 : 2) + " MB";
+      }
+
+      function downloadBlob(blob, fileName) {
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement("a");
+        a.href = url;
+        a.download = fileName;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(function () {
+          URL.revokeObjectURL(url);
+        }, 1000);
+      }
+
+      async function exportWord() {
+        if (!images.length) {
+          setWarning("請先選取圖片，再匯出 Word。");
+          return;
+        }
+
+        exportBtn.disabled = true;
+        exportBtn.textContent = "匯出中...";
+        setWarning("");
+
+        try {
+          var imageInfos = [];
+          var originalBytes = images.reduce(function (sum, item) {
+            return sum + item.file.size;
+          }, 0);
+
+          for (var i = 0; i < images.length; i += 1) {
+            exportBtn.textContent = "壓縮中 " + (i + 1) + "/" + images.length;
+            var imageInfo = await getExportImageInfo(images[i]);
+            imageInfo.ref = "image" + String(i + 1).padStart(3, "0") + "." + extensionForDataUrl(imageInfo.dataUrl);
+            imageInfos.push(imageInfo);
+            await new Promise(function (resolve) {
+              setTimeout(resolve, 0);
+            });
+          }
+
+          exportBtn.textContent = "產生 DOCX...";
+          var blob = buildDocxBlob(imageInfos);
+          downloadBlob(blob, safeFileName(getWordTitle()) + ".docx");
+          setWarning("已匯出 Word DOCX。原始圖片約 " + formatBytes(originalBytes) + "，匯出檔約 " + formatBytes(blob.size) + "。");
+        } catch (error) {
+          setWarning("匯出失敗，請確認圖片可正常讀取後再試一次。");
+        } finally {
+          exportBtn.disabled = false;
+          exportBtn.textContent = "匯出 Word";
+        }
+      }
+
+      imageInput.addEventListener("change", function () {
+        handleFiles(imageInput.files || []);
+      });
+
+      titleInput.addEventListener("input", renderReport);
+      colsSelect.addEventListener("change", renderReport);
+      rowsSelect.addEventListener("change", renderReport);
+      document.querySelectorAll("input[name='captionMode']").forEach(function (input) {
+        input.addEventListener("change", renderReport);
+      });
+      printModeInputs.forEach(function (input) {
+        input.addEventListener("change", renderReport);
+      });
+
+      printBtn.addEventListener("click", function () {
+        if (!images.length) {
+          setWarning("請先選取圖片，再執行列印。");
+          return;
+        }
+        window.print();
+      });
+
+      exportBtn.addEventListener("click", exportWord);
+
+      window.addEventListener("beforeunload", clearObjectUrls);
+    }());
+  </script>
+</body>
+</html>
