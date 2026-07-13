@@ -818,9 +818,9 @@
       var images = [];
       var objectUrls = [];
       var exportProfiles = {
-        clear: { maxLongEdge: 2400, jpegQuality: 0.86 },
-        small: { maxLongEdge: 1700, jpegQuality: 0.78 },
-        high: { maxLongEdge: 3200, jpegQuality: 0.9 }
+        clear: { maxLongEdge: 2200, jpegQuality: 0.84 },
+        small: { maxLongEdge: 1600, jpegQuality: 0.76 },
+        high: { maxLongEdge: 2800, jpegQuality: 0.88 }
       };
       var pdfProfiles = {
         clear: { dpi: 170, jpegQuality: 0.86 },
@@ -1148,17 +1148,7 @@
 
       async function getExportImageInfo(item) {
         var compressed = await compressImageForWord(item);
-        var mustConvert = item.file.type === "image/webp" || /\.webp$/i.test(item.name);
-
-        if (!mustConvert && compressed.bytes >= item.file.size * 0.98) {
-          return {
-            dataUrl: await readFileAsDataUrl(item.file),
-            bytes: item.file.size,
-            width: compressed.originalWidth,
-            height: compressed.originalHeight
-          };
-        }
-
+        // Mobile Word/preview is more reliable when every image is normalized to JPEG.
         return {
           dataUrl: compressed.dataUrl,
           bytes: compressed.bytes,
@@ -1519,21 +1509,12 @@
       }
 
       function buildContentTypes(imageInfos) {
-        var seen = {};
-        imageInfos.forEach(function (imageInfo) {
-          seen[imageInfo.extension] = true;
-        });
         var defaults = [
           "<Default Extension='rels' ContentType='application/vnd.openxmlformats-package.relationships+xml'/>",
-          "<Default Extension='xml' ContentType='application/xml'/>"
+          "<Default Extension='xml' ContentType='application/xml'/>",
+          "<Default Extension='jpg' ContentType='image/jpeg'/>",
+          "<Default Extension='jpeg' ContentType='image/jpeg'/>"
         ];
-        if (seen.jpg || seen.jpeg) {
-          defaults.push("<Default Extension='jpg' ContentType='image/jpeg'/>");
-          defaults.push("<Default Extension='jpeg' ContentType='image/jpeg'/>");
-        }
-        if (seen.png) {
-          defaults.push("<Default Extension='png' ContentType='image/png'/>");
-        }
 
         return "<?xml version='1.0' encoding='UTF-8' standalone='yes'?>" +
           "<Types xmlns='http://schemas.openxmlformats.org/package/2006/content-types'>" +
