@@ -1135,8 +1135,17 @@
 
           return nonWhite >= Math.max(5, samples * 0.003) || (maxLum - minLum) > 12;
         } catch (error) {
-          return true;
+          return false;
         }
+      }
+
+      function isSuspiciousTinyJpeg(dataUrl, width, height) {
+        var bytes = estimateDataUrlBytes(dataUrl);
+        var pixels = width * height;
+        if (pixels < 120000) {
+          return false;
+        }
+        return bytes < Math.max(9000, pixels / 45);
       }
 
       function loadImageElement(src) {
@@ -1342,6 +1351,10 @@
               var dataUrl = canvas.toDataURL("image/jpeg", profile.jpegQuality);
               canvas.width = 1;
               canvas.height = 1;
+
+              if (isSuspiciousTinyJpeg(dataUrl, targetWidth, targetHeight)) {
+                throw new Error("手機瀏覽器輸出疑似空白圖片，改用備援解碼");
+              }
 
               if (isUsableJpegDataUrl(dataUrl)) {
                 if (sourceInfo.close) {
