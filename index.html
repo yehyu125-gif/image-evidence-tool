@@ -1104,6 +1104,99 @@
         return /^data:image\/jpeg;base64,/i.test(String(dataUrl || "")) && base64Payload(dataUrl).length > 100;
       }
 
+      function canvasHasVisiblePixels(context, width, height) {
+        try {
+          var stepX = Math.max(1, Math.floor(width / 72));
+          var stepY = Math.max(1, Math.floor(height / 72));
+          var data = context.getImageData(0, 0, width, height).data;
+          var samples = 0;
+          var nonWhite = 0;
+          var minLum = 255;
+          var maxLum = 0;
+
+          for (var y = 0; y < height; y += stepY) {
+            for (var x = 0; x < width; x += stepX) {
+              var index = (y * width + x) * 4;
+              var red = data[index];
+              var green = data[index + 1];
+              var blue = data[index + 2];
+              var lum = (red + green + blue) / 3;
+              var channelSpread = Math.max(red, green, blue) - Math.min(red, green, blue);
+
+              samples += 1;
+              minLum = Math.min(minLum, lum);
+              maxLum = Math.max(maxLum, lum);
+
+              if (lum < 246 || channelSpread > 8) {
+                nonWhite += 1;
+              }
+            }
+          }
+
+          return nonWhite >= Math.max(5, samples * 0.003) || (maxLum - minLum) > 12;
+        } catch (error) {
+          return true;
+        }
+      }
+
+      function loadImageElement(src) {
+        return new Promise(function (resolve, reject) {
+          var img = new Image();
+          img.onload = function () {
+            resolve(img);
+          };
+          img.onerror = function () {
+            reject(new Error("圖片解碼失敗"));
+          };
+          img.src = src;
+        });
+      }
+
+      async function loadWordImageSources(item) {
+        var sources = [];
+
+        if (item.file && typeof createImageBitmap === "function") {
+          try {
+            var bitmap = await createImageBitmap(item.file, { imageOrientation: "from-image" });
+            sources.push({
+              source: bitmap,
+              width: bitmap.width,
+              height: bitmap.height,
+              close: function () {
+                if (typeof bitmap.close === "function") {
+                  bitmap.close();
+                }
+              }
+            });
+          } catch (error) {
+            // Some mobile browsers reject specific JPEG encodings here; DataURL is the fallback below.
+          }
+        }
+
+        if (item.file) {
+          var dataUrl = await readFileAsDataUrl(item.file);
+          var dataUrlImage = await loadImageElement(dataUrl);
+          sources.push({
+            source: dataUrlImage,
+            width: dataUrlImage.naturalWidth || dataUrlImage.width,
+            height: dataUrlImage.naturalHeight || dataUrlImage.height,
+            close: function () {}
+          });
+        }
+
+        if (!sources.length && item.url) {
+          var urlImage = await loadImageElement(item.url);
+          sources.push({
+            source: urlImage,
+            width: urlImage.naturalWidth || urlImage.width,
+            height: urlImage.naturalHeight || urlImage.height,
+            close: function () {}
+          });
+        }
+
+        return sources;
+      }
+
       function getWordImageBounds(cols, rows) {
         var metrics = getDocxMetrics(cols, rows);
         var profile = getExportProfile();
@@ -1193,8 +1286,124 @@
         });
       }
 
+      async function compressImageForWordMobileSafe(item, bounds) {
+        var sources = await loadWordImageSources(item);
+        var profile = getExportProfile();
+        var retryScales = [1, 0.82, 0.68, 0.54, 0.42];
+        var lastError = null;
+
+        for (var sourceIndex = 0; sourceIndex < sources.length; sourceIndex += 1) {
+          var sourceInfo = sources[sourceIndex];
+          var originalWidth = sourceInfo.width;
+          var originalHeight = sourceInfo.height;
+
+          if (!originalWidth || !originalHeight) {
+            lastError = new Error("圖片尺寸讀取失敗");
+            if (sourceInfo.close) {
+              sourceInfo.close();
+            }
+            continue;
+          }
+
+          var baseScale = Math.min(
+            1,
+            profile.maxLongEdge / Math.max(originalWidth, originalHeight),
+            (bounds && bounds.maxWidth ? bounds.maxWidth : profile.maxLongEdge) / originalWidth,
+            (bounds && bounds.maxHeight ? bounds.maxHeight : profile.maxLongEdge) / originalHeight
+          );
+
+          for (var attempt = 0; attempt < retryScales.length; attempt += 1) {
+            var scale = baseScale * retryScales[attempt];
+            var targetWidth = Math.max(1, Math.round(originalWidth * scale));
+            var targetHeight = Math.max(1, Math.round(originalHeight * scale));
+            var pixels = targetWidth * targetHeight;
+
+            if (pixels > profile.maxPixels) {
+              var pixelScale = Math.sqrt(profile.maxPixels / pixels);
+              targetWidth = Math.max(1, Math.round(targetWidth * pixelScale));
+              targetHeight = Math.max(1, Math.round(targetHeight * pixelScale));
+            }
+
+            try {
+              var canvas = document.createElement("canvas");
+              canvas.width = targetWidth;
+              canvas.height = targetHeight;
+              var context = canvas.getContext("2d", { alpha: false });
+              context.imageSmoothingEnabled = true;
+              context.imageSmoothingQuality = "high";
+              context.fillStyle = "#ffffff";
+              context.fillRect(0, 0, canvas.width, canvas.height);
+              context.drawImage(sourceInfo.source, 0, 0, targetWidth, targetHeight);
+
+              if (!canvasHasVisiblePixels(context, targetWidth, targetHeight)) {
+                throw new Error("手機瀏覽器輸出空白圖片，改用備援解碼");
+              }
+
+              var dataUrl = canvas.toDataURL("image/jpeg", profile.jpegQuality);
+              canvas.width = 1;
+              canvas.height = 1;
+
+              if (isUsableJpegDataUrl(dataUrl)) {
+                if (sourceInfo.close) {
+                  sourceInfo.close();
+                }
+                return {
+                  dataUrl: dataUrl,
+                  bytes: estimateDataUrlBytes(dataUrl),
+                  width: targetWidth,
+                  height: targetHeight,
+                  originalWidth: originalWidth,
+                  originalHeight: originalHeight
+                };
+              }
+
+              lastError = new Error("手機瀏覽器未產生有效 JPEG");
+            } catch (error) {
+              lastError = error;
+            }
+          }
+
+          if (sourceInfo.close) {
+            sourceInfo.close();
+          }
+        }
+
+        throw lastError || new Error("圖片轉換失敗");
+      }
+
+      function isOriginalJpegFile(item) {
+        if (!item || !item.file) {
+          return false;
+        }
+        return item.file.type === "image/jpeg" || /\.jpe?g$/i.test(item.file.name || item.name || "");
+      }
+
+      async function getOriginalJpegImageInfo(item) {
+        var dataUrl = await readFileAsDataUrl(item.file);
+        if (!isUsableJpegDataUrl(dataUrl)) {
+          throw new Error("原始 JPG 讀取失敗");
+        }
+
+        var img = await loadImageElement(dataUrl);
+        return {
+          dataUrl: dataUrl,
+          bytes: estimateDataUrlBytes(dataUrl),
+          width: img.naturalWidth || img.width,
+          height: img.naturalHeight || img.height
+        };
+      }
+
       async function getExportImageInfo(item, bounds) {
-        var compressed = await compressImageForWord(item, bounds);
+        var compressed;
+        try {
+          compressed = await compressImageForWordMobileSafe(item, bounds);
+        } catch (error) {
+          if (isOriginalJpegFile(item)) {
+            return getOriginalJpegImageInfo(item);
+          }
+          throw error;
+        }
+
         // Mobile Word/preview is more reliable when every image is normalized to JPEG.
         return {
           dataUrl: compressed.dataUrl,
