@@ -787,7 +787,6 @@
       </div>
     </section>
   </main>
-
   <script>
     (function () {
       "use strict";
@@ -818,9 +817,9 @@
       var images = [];
       var objectUrls = [];
       var exportProfiles = {
-        clear: { maxLongEdge: 2200, jpegQuality: 0.84 },
-        small: { maxLongEdge: 1600, jpegQuality: 0.76 },
-        high: { maxLongEdge: 2800, jpegQuality: 0.88 }
+        clear: { maxLongEdge: 1600, jpegQuality: 0.82, wordDpi: 180, maxPixels: 2200000 },
+        small: { maxLongEdge: 1200, jpegQuality: 0.74, wordDpi: 150, maxPixels: 1400000 },
+        high: { maxLongEdge: 2000, jpegQuality: 0.86, wordDpi: 220, maxPixels: 3200000 }
       };
       var pdfProfiles = {
         clear: { dpi: 170, jpegQuality: 0.86 },
@@ -1101,7 +1100,22 @@
         return Math.max(0, Math.floor(payload.length * 3 / 4) - padding);
       }
 
-      function compressImageForWord(item) {
+      function isUsableJpegDataUrl(dataUrl) {
+        return /^data:image\/jpeg;base64,/i.test(String(dataUrl || "")) && base64Payload(dataUrl).length > 100;
+      }
+
+      function getWordImageBounds(cols, rows) {
+        var metrics = getDocxMetrics(cols, rows);
+        var profile = getExportProfile();
+        var widthMm = Math.max(5, metrics.innerWidth - wordLayout.docxImageSlack);
+        var heightMm = Math.max(5, metrics.imageAreaHeight - wordLayout.docxImageSlack);
+        return {
+          maxWidth: Math.max(1, Math.round(widthMm * profile.wordDpi / 25.4)),
+          maxHeight: Math.max(1, Math.round(heightMm * profile.wordDpi / 25.4))
+        };
+      }
+
+      function compressImageForWord(item, bounds) {
         return new Promise(function (resolve, reject) {
           var img = new Image();
           img.onload = function () {
@@ -1114,27 +1128,60 @@
               }
 
               var profile = getExportProfile();
-              var scale = Math.min(1, profile.maxLongEdge / Math.max(originalWidth, originalHeight));
-              var targetWidth = Math.max(1, Math.round(originalWidth * scale));
-              var targetHeight = Math.max(1, Math.round(originalHeight * scale));
-              var canvas = document.createElement("canvas");
-              canvas.width = targetWidth;
-              canvas.height = targetHeight;
-              var context = canvas.getContext("2d");
-              context.imageSmoothingEnabled = true;
-              context.imageSmoothingQuality = "high";
-              context.fillStyle = "#ffffff";
-              context.fillRect(0, 0, canvas.width, canvas.height);
-              context.drawImage(img, 0, 0, targetWidth, targetHeight);
-              var dataUrl = canvas.toDataURL("image/jpeg", profile.jpegQuality);
-              resolve({
-                dataUrl: dataUrl,
-                bytes: estimateDataUrlBytes(dataUrl),
-                width: targetWidth,
-                height: targetHeight,
-                originalWidth: originalWidth,
-                originalHeight: originalHeight
-              });
+              var baseScale = Math.min(
+                1,
+                profile.maxLongEdge / Math.max(originalWidth, originalHeight),
+                (bounds && bounds.maxWidth ? bounds.maxWidth : profile.maxLongEdge) / originalWidth,
+                (bounds && bounds.maxHeight ? bounds.maxHeight : profile.maxLongEdge) / originalHeight
+              );
+              var retryScales = [1, 0.82, 0.68, 0.54, 0.42];
+              var lastError = null;
+
+              for (var attempt = 0; attempt < retryScales.length; attempt += 1) {
+                var scale = baseScale * retryScales[attempt];
+                var targetWidth = Math.max(1, Math.round(originalWidth * scale));
+                var targetHeight = Math.max(1, Math.round(originalHeight * scale));
+                var pixels = targetWidth * targetHeight;
+
+                if (pixels > profile.maxPixels) {
+                  var pixelScale = Math.sqrt(profile.maxPixels / pixels);
+                  targetWidth = Math.max(1, Math.round(targetWidth * pixelScale));
+                  targetHeight = Math.max(1, Math.round(targetHeight * pixelScale));
+                }
+
+                try {
+                  var canvas = document.createElement("canvas");
+                  canvas.width = targetWidth;
+                  canvas.height = targetHeight;
+                  var context = canvas.getContext("2d", { alpha: false });
+                  context.imageSmoothingEnabled = true;
+                  context.imageSmoothingQuality = "high";
+                  context.fillStyle = "#ffffff";
+                  context.fillRect(0, 0, canvas.width, canvas.height);
+                  context.drawImage(img, 0, 0, targetWidth, targetHeight);
+                  var dataUrl = canvas.toDataURL("image/jpeg", profile.jpegQuality);
+                  canvas.width = 1;
+                  canvas.height = 1;
+
+                  if (isUsableJpegDataUrl(dataUrl)) {
+                    resolve({
+                      dataUrl: dataUrl,
+                      bytes: estimateDataUrlBytes(dataUrl),
+                      width: targetWidth,
+                      height: targetHeight,
+                      originalWidth: originalWidth,
+                      originalHeight: originalHeight
+                    });
+                    return;
+                  }
+
+                  lastError = new Error("手機瀏覽器未產生有效 JPEG");
+                } catch (error) {
+                  lastError = error;
+                }
+              }
+
+              reject(lastError || new Error("圖片轉換失敗"));
             } catch (error) {
               reject(error);
             }
@@ -1146,8 +1193,8 @@
         });
       }
 
-      async function getExportImageInfo(item) {
-        var compressed = await compressImageForWord(item);
+      async function getExportImageInfo(item, bounds) {
+        var compressed = await compressImageForWord(item, bounds);
         // Mobile Word/preview is more reliable when every image is normalized to JPEG.
         return {
           dataUrl: compressed.dataUrl,
@@ -2026,6 +2073,9 @@
         setWarning("");
 
         try {
+          var cols = Number(colsSelect.value);
+          var rows = Number(rowsSelect.value);
+          var wordImageBounds = getWordImageBounds(cols, rows);
           var imageInfos = [];
           var originalBytes = images.reduce(function (sum, item) {
             return sum + item.file.size;
@@ -2033,7 +2083,7 @@
 
           for (var i = 0; i < images.length; i += 1) {
             exportBtn.textContent = "壓縮中 " + (i + 1) + "/" + images.length;
-            var imageInfo = await getExportImageInfo(images[i]);
+            var imageInfo = await getExportImageInfo(images[i], wordImageBounds);
             imageInfo.ref = "image" + String(i + 1).padStart(3, "0") + "." + extensionForDataUrl(imageInfo.dataUrl);
             imageInfos.push(imageInfo);
             await new Promise(function (resolve) {
